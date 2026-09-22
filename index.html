@@ -74,8 +74,8 @@
           <select id="productCategoryFilter"><option value="">Semua kategori</option></select>
         </div>
         <div class="panel table-wrap">
-          <table><thead><tr><th>Produk</th><th>Kategori</th><th>Harga</th><th>Status</th><th>Aksi</th></tr></thead>
-          <tbody id="productsTableBody"><tr><td colspan="5" class="empty">Memuat produk...</td></tr></tbody></table>
+          <table><thead><tr><th>Produk</th><th>Kategori</th><th>Harga</th><th>Status</th><th>Unggulan</th><th>Aksi</th></tr></thead>
+          <tbody id="productsTableBody"><tr><td colspan="6" class="empty">Memuat produk...</td></tr></tbody></table>
         </div>
       </section>
 
@@ -121,6 +121,7 @@
           <label>Slug*<input id="productSlug" required placeholder="contoh-nama-produk"></label>
           <label>Kategori<select id="productCategory"></select></label>
           <label>Harga<input id="productPrice" type="number" min="0" step="1" placeholder="17000"></label>
+          <label class="full">Gambar Produk<input id="productImage" type="file" accept="image/*"><small id="productImageInfo" class="muted">JPG, PNG, WEBP. Maksimal 5 MB.</small><img id="productImagePreview" class="product-image-preview" alt="Preview gambar produk" hidden></label>
           <label>Ukuran<input id="productSize" placeholder="100 ml"></label>
           <label>Badge<input id="productBadge" placeholder="HOME CARE"></label>
           <label class="full">Deskripsi Singkat<textarea id="productShort" rows="3"></textarea></label>
