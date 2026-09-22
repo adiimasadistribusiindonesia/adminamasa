@@ -18,9 +18,44 @@
 </section></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
 const db=supabase.createClient("https://fysaxpqpqexjnlpkbwap.supabase.co","sb_publishable_DWRaEZTcNMjhglwN3nqCOw_pua8rsjD");
-const form=document.getElementById("resetForm"),msg=document.getElementById("msg");
+const form=document.getElementById("resetForm"),msg=document.getElementById("msg"),submit=document.getElementById("submit");
 let recovery=false;
-function setRecovery(){recovery=true;document.getElementById("emailWrap").classList.add("hidden");document.getElementById("passWrap").classList.remove("hidden");document.getElementById("confirmWrap").classList.remove("hidden");document.getElementById("title").textContent="Password Baru";document.getElementById("desc").textContent="Buat password baru untuk akun Admin AMASA.";document.getElementById("submit").textContent="Simpan Password Baru";}
+const RATE_LIMIT_MS=60*60*1000, RATE_LIMIT_KEY="amasa_reset_rate_limit_until";
+let countdownTimer=null;
+function formatCountdown(ms){const total=Math.max(0,Math.ceil(ms/1000)),h=Math.floor(total/3600),m=Math.floor((total%3600)/60),s=total%60;return h+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");}
+function startRateLimitCountdown(until){
+  localStorage.setItem(RATE_LIMIT_KEY,String(until));
+  clearInterval(countdownTimer);
+  submit.disabled=true;
+  submit.style.opacity=".6";
+  submit.style.cursor="not-allowed";
+  const tick=()=>{
+    const remaining=until-Date.now();
+    if(remaining<=0){
+      clearInterval(countdownTimer);
+      localStorage.removeItem(RATE_LIMIT_KEY);
+      submit.disabled=false;
+      submit.style.opacity="";
+      submit.style.cursor="";
+      msg.textContent="Batas waktu selesai. Silakan kirim link reset lagi.";
+      return;
+    }
+    msg.textContent="Batas pengiriman email tercapai. Coba lagi dalam "+formatCountdown(remaining);
+  };
+  tick();
+  countdownTimer=setInterval(tick,1000);
+}
+function restoreRateLimitCountdown(){
+  const until=Number(localStorage.getItem(RATE_LIMIT_KEY)||0);
+  if(until>Date.now()) startRateLimitCountdown(until);
+  else localStorage.removeItem(RATE_LIMIT_KEY);
+}
+function isRateLimitError(error){
+  const text=String(error?.message||error?.code||"").toLowerCase();
+  return text.includes("rate limit")||text.includes("too many")||text.includes("over_email_send_rate_limit")||text.includes("email rate limit");
+}
+function setRecovery(){recovery=true;clearInterval(countdownTimer);localStorage.removeItem(RATE_LIMIT_KEY);document.getElementById("emailWrap").classList.add("hidden");document.getElementById("passWrap").classList.remove("hidden");document.getElementById("confirmWrap").classList.remove("hidden");document.getElementById("title").textContent="Password Baru";document.getElementById("desc").textContent="Buat password baru untuk akun Admin AMASA.";submit.textContent="Simpan Password Baru";submit.disabled=false;submit.style.opacity="";submit.style.cursor="";}
 db.auth.onAuthStateChange((event,session)=>{if(event==="PASSWORD_RECOVERY"&&session)setRecovery();});
-form.onsubmit=async e=>{e.preventDefault();if(!recovery){msg.textContent="Mengirim link reset...";const {error}=await db.auth.resetPasswordForEmail(document.getElementById("email").value.trim(),{redirectTo:location.origin+location.pathname});msg.textContent=error?error.message:"Link reset sudah dikirim. Silakan cek Gmail/spam."}else{const p=document.getElementById("password").value,c=document.getElementById("confirm").value;if(p!==c){msg.textContent="Password tidak sama.";return}if(p.length<6){msg.textContent="Password minimal 6 karakter.";return}msg.textContent="Menyimpan...";const {error}=await db.auth.updateUser({password:p});if(error){msg.textContent=error.message;return}await db.auth.signOut();msg.className="login-msg ok";msg.textContent="Password berhasil diubah. Silakan login kembali.";setTimeout(()=>location.href="login.html",1200)}};
+restoreRateLimitCountdown();
+form.onsubmit=async e=>{e.preventDefault();if(!recovery){if(submit.disabled)return;msg.textContent="Mengirim link reset...";const {error}=await db.auth.resetPasswordForEmail(document.getElementById("email").value.trim(),{redirectTo:location.origin+location.pathname});if(error){msg.textContent=error.message;if(isRateLimitError(error))startRateLimitCountdown(Date.now()+RATE_LIMIT_MS);}else{msg.className="login-msg ok";msg.textContent="Link reset sudah dikirim. Silakan cek Gmail/spam.";}}else{const p=document.getElementById("password").value,c=document.getElementById("confirm").value;if(p!==c){msg.textContent="Password tidak sama.";return}if(p.length<6){msg.textContent="Password minimal 6 karakter.";return}msg.textContent="Menyimpan...";const {error}=await db.auth.updateUser({password:p});if(error){msg.textContent=error.message;return}await db.auth.signOut();msg.className="login-msg ok";msg.textContent="Password berhasil diubah. Silakan login kembali.";setTimeout(()=>location.href="login.html",1200)}};
 </script></body></html>
