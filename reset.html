@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AMASA Admin - Reset Password</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<main class="login-page">
+<section class="login-card">
+<div class="login-logo">AMASA</div>
+<div class="login-sub">ADMIN PANEL</div>
+<h1>Reset Password</h1>
+<p>Halaman khusus pemulihan password Admin AMASA.</p>
+<form id="resetForm" class="login-form">
+<label>Email<input id="email" type="email" required></label>
+<button type="submit">Kirim Link Reset</button>
+<div id="msg" class="login-msg"></div>
+</form>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const db=supabase.createClient("https://fysaxpqpqexjnlpkbwap.supabase.co","sb_publishable_DWRaEZTcNMjhglwN3nqCOw_pua8rsjD");
+document.getElementById("resetForm").onsubmit=async e=>{
+ e.preventDefault();
+ const msg=document.getElementById("msg");
+ msg.textContent="Mengirim link reset...";
+ const {error}=await db.auth.resetPasswordForEmail(document.getElementById("email").value.trim(),{redirectTo:location.origin+location.pathname});
+ msg.textContent=error?error.message:"Link reset sudah dikirim. Silakan cek Gmail/spam.";
+};
+</script>
+</body>
+</html>
