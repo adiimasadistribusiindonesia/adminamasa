@@ -80,7 +80,7 @@
       </section>
 
       <section class="page" id="page-categories">
-        <div class="page-head"><div><span class="eyebrow">CATALOG</span><h2>Kategori</h2><p>Kelola kategori yang digunakan pada katalog produk.</p></div><button class="primary" id="addCategoryButton">+ Tambah Kategori</button></div>
+        <div class="page-head"><div><span class="eyebrow">CATALOG</span><h2>Kategori</h2><p>Kategori yang digunakan pada katalog produk.</p></div></div>
         <div class="panel"><div id="categoriesList" class="category-list"><div class="empty">Memuat kategori...</div></div></div>
       </section>
 
@@ -137,24 +137,6 @@
     </div>
   </div>
 
-  <div class="modal" id="categoryModal" hidden>
-    <div class="modal-backdrop" data-category-close></div>
-    <div class="modal-box">
-      <button class="modal-close" data-category-close>×</button>
-      <div class="modal-head"><span class="eyebrow">CATEGORY</span><h2 id="categoryModalTitle">Tambah Kategori</h2></div>
-      <form id="categoryForm">
-        <input type="hidden" id="categoryId">
-        <div class="form-grid">
-          <label>Nama Kategori*<input id="categoryName" required></label>
-          <label>Slug*<input id="categorySlug" required placeholder="contoh-kategori"></label>
-          <label class="full">Deskripsi<textarea id="categoryDescription" rows="4"></textarea></label>
-          <label>Urutan<input id="categoryOrder" type="number" value="0"></label>
-          <label class="check-row"><input id="categoryActive" type="checkbox" checked> Kategori aktif</label>
-        </div>
-        <div class="form-actions"><button type="button" class="secondary" data-category-close>Batal</button><button type="submit" class="primary" id="saveCategory">Simpan Kategori</button></div>
-      </form>
-    </div>
-  </div>
 
   <div class="toast" id="toast" hidden></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
