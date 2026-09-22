@@ -1,33 +1,23 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AMASA Admin — Login</title><link rel="stylesheet" href="admin.css"><style>
 .login-page{min-height:100vh;display:grid;place-items:center;padding:25px;background:linear-gradient(135deg,#0b1928,#244966)}
 .login-card{width:min(430px,94vw);background:#fff;border-radius:16px;padding:35px;box-shadow:0 30px 80px #0005}
-.login-logo{font-size:30px;font-weight:900;letter-spacing:.18em;color:#102437}.login-sub{font-size:10px;font-weight:900;letter-spacing:.16em;color:#b58a50;margin-top:5px}.login-card h1{margin:30px 0 8px}.login-card p{color:#6b7785;font-size:13px}.login-form{display:grid;gap:15px;margin-top:25px}.login-form label{display:grid;gap:7px;font-size:12px;font-weight:800}.login-form input{width:100%;padding:12px;border:1px solid #e2e7eb;border-radius:8px}.login-form button{border:0;border-radius:8px;padding:12px;background:#b58a50;color:#fff;font-weight:800}.login-msg{font-size:12px;color:#b83b3b;min-height:18px}
-</style></head><body><main class="login-page"><section class="login-card"><div class="login-logo">AMASA</div><div class="login-sub">ADMIN PANEL</div><h1>Masuk Admin</h1><p>Gunakan akun Supabase yang sudah diberi akses admin AMASA.</p><form class="login-form" id="loginForm"><label>Email<input id="email" type="email" autocomplete="username" required></label><label>Password<input id="password" type="password" autocomplete="current-password" required></label><button type="submit">Masuk</button><div class="login-msg" id="msg"></div></form></section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
+.login-logo{font-size:30px;font-weight:900;letter-spacing:.18em;color:#102437}.login-sub{font-size:10px;font-weight:900;letter-spacing:.16em;color:#b58a50;margin-top:5px}.login-card h1{margin:30px 0 8px}.login-card p{color:#6b7785;font-size:13px}.login-form{display:grid;gap:15px;margin-top:25px}.login-form label{display:grid;gap:7px;font-size:12px;font-weight:800}.login-form input{width:100%;padding:12px;border:1px solid #e2e7eb;border-radius:8px}.login-form button{border:0;border-radius:8px;padding:12px;background:#b58a50;color:#fff;font-weight:800;cursor:pointer}.login-form button.secondary{background:transparent;color:#8d6b3e;padding:4px}.login-msg{font-size:12px;color:#b83b3b;min-height:18px}.login-msg.ok{color:#27763e}.login-link{border:0;background:none;color:#8d6b3e;font-size:12px;font-weight:800;cursor:pointer;padding:0;text-align:center}.hidden{display:none!important}
+</style></head><body><main class="login-page"><section class="login-card"><div class="login-logo">AMASA</div><div class="login-sub">ADMIN PANEL</div>
+<div id="loginView"><h1>Masuk Admin</h1><p>Gunakan akun Supabase yang sudah diberi akses admin AMASA.</p><form class="login-form" id="loginForm"><label>Email<input id="email" type="email" autocomplete="username" required></label><label>Password<input id="password" type="password" autocomplete="current-password" required></label><button type="submit">Masuk</button><button type="button" class="login-link" id="forgotButton">Lupa Password?</button><div class="login-msg" id="msg"></div></form></div>
+<div id="forgotView" class="hidden"><h1>Lupa Password</h1><p>Masukkan email akun AMASA. Kami akan mengirimkan link untuk membuat password baru.</p><form class="login-form" id="forgotForm"><label>Email<input id="forgotEmail" type="email" autocomplete="email" required></label><button type="submit">Kirim Link Reset</button><button type="button" class="login-link" id="backLogin">Kembali ke Login</button><div class="login-msg" id="forgotMsg"></div></form></div>
+<div id="resetView" class="hidden"><h1>Password Baru</h1><p>Buat password baru untuk akun Admin AMASA.</p><form class="login-form" id="resetForm"><label>Password Baru<input id="newPassword" type="password" minlength="6" autocomplete="new-password" required></label><label>Ulangi Password<input id="confirmPassword" type="password" minlength="6" autocomplete="new-password" required></label><button type="submit">Simpan Password Baru</button><div class="login-msg" id="resetMsg"></div></form></div>
+</section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
 const db=supabase.createClient("https://fysaxpqpqexjnlpkbwap.supabase.co","sb_publishable_DWRaEZTcNMjhglwN3nqCOw_pua8rsjD");
-async function checkAdmin(){
-  const {data:{user},error:userError}=await db.auth.getUser();
-  if(userError||!user)return false;
-  const {data:admin,error}=await db.from("amasa_admins").select("user_id,role").eq("user_id",user.id).eq("role","admin").maybeSingle();
-  return !error&&!!admin;
-}
-(async()=>{
-  const {data:{session}}=await db.auth.getSession();
-  if(session){
-    if(await checkAdmin()) location.href="index.html";
-    else await db.auth.signOut();
-  }
-})();
-document.getElementById("loginForm").onsubmit=async e=>{
-  e.preventDefault();
-  const msg=document.getElementById("msg");
-  msg.textContent="Memproses...";
-  const {error}=await db.auth.signInWithPassword({email:document.getElementById("email").value.trim(),password:document.getElementById("password").value});
-  if(error){msg.textContent=error.message;return}
-  if(!(await checkAdmin())){
-    await db.auth.signOut();
-    msg.textContent="Akses ditolak. Akun ini belum diberi role admin AMASA.";
-    return;
-  }
-  location.href="index.html";
-};
+const loginView=document.getElementById("loginView"),forgotView=document.getElementById("forgotView"),resetView=document.getElementById("resetView");
+const msg=document.getElementById("msg"),forgotMsg=document.getElementById("forgotMsg"),resetMsg=document.getElementById("resetMsg");
+async function checkAdmin(){const {data:{user},error:userError}=await db.auth.getUser();if(userError||!user)return false;const {data:admin,error}=await db.from("amasa_admins").select("user_id,role").eq("user_id",user.id).eq("role","admin").maybeSingle();return !error&&!!admin}
+function show(view){loginView.classList.toggle("hidden",view!=="login");forgotView.classList.toggle("hidden",view!=="forgot");resetView.classList.toggle("hidden",view!=="reset")}
+function recoveryRedirect(){return window.location.origin+window.location.pathname}
+db.auth.onAuthStateChange((event,session)=>{if(event==="PASSWORD_RECOVERY"&&session)show("reset")});
+(async()=>{const {data:{session}}=await db.auth.getSession();if(session){if(await checkAdmin())location.href="index.html";else await db.auth.signOut()} })();
+document.getElementById("loginForm").onsubmit=async e=>{e.preventDefault();msg.className="login-msg";msg.textContent="Memproses...";const {error}=await db.auth.signInWithPassword({email:document.getElementById("email").value.trim(),password:document.getElementById("password").value});if(error){msg.textContent=error.message;return}if(!(await checkAdmin())){await db.auth.signOut();msg.textContent="Akses ditolak. Akun ini belum diberi role admin AMASA.";return}location.href="index.html"};
+document.getElementById("forgotButton").onclick=()=>{document.getElementById("forgotEmail").value=document.getElementById("email").value.trim();forgotMsg.textContent="";show("forgot")};
+document.getElementById("backLogin").onclick=()=>{forgotMsg.textContent="";show("login")};
+document.getElementById("forgotForm").onsubmit=async e=>{e.preventDefault();forgotMsg.className="login-msg";forgotMsg.textContent="Mengirim link reset...";const email=document.getElementById("forgotEmail").value.trim();const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:recoveryRedirect()});if(error){forgotMsg.textContent=error.message;return}forgotMsg.className="login-msg ok";forgotMsg.textContent="Jika email terdaftar, link reset password sudah dikirim. Silakan cek inbox/spam."};
+document.getElementById("resetForm").onsubmit=async e=>{e.preventDefault();resetMsg.className="login-msg";const p=document.getElementById("newPassword").value,c=document.getElementById("confirmPassword").value;if(p!==c){resetMsg.textContent="Password tidak sama.";return}if(p.length<6){resetMsg.textContent="Password minimal 6 karakter.";return}resetMsg.textContent="Menyimpan...";const {error}=await db.auth.updateUser({password:p});if(error){resetMsg.textContent=error.message;return}await db.auth.signOut();resetMsg.className="login-msg ok";resetMsg.textContent="Password berhasil diubah. Mengalihkan ke login...";setTimeout(()=>show("login"),1200)};
 </script></body></html>
