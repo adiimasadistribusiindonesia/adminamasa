@@ -6,7 +6,20 @@ const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 function toast(m){const e=$("#toast");e.textContent=m;e.hidden=false;setTimeout(()=>e.hidden=true,2800)}
 function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
 function rupiah(v){return new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(v)}
-async function requireSession(){const {data:{session}}=await db.auth.getSession();if(!session){location.href="login.html";return false}return true}
+
+async function requireAdmin(){
+  const {data:{user},error:userError}=await db.auth.getUser();
+  if(userError||!user){location.href="login.html";return false}
+  const {data:admin,error:adminError}=await db.from("amasa_admins").select("user_id,role").eq("user_id",user.id).eq("role","admin").maybeSingle();
+  if(adminError||!admin){
+    await db.auth.signOut();
+    alert("Akses ditolak. Akun ini bukan Admin AMASA.");
+    location.href="login.html";
+    return false;
+  }
+  return true;
+}
+
 async function check(){const e=$("#apiStatus");const {error}=await db.from("amasa_products").select("id",{count:"exact",head:true});if(error){e.textContent="Supabase Error";$("#statSystem").textContent="OFF";throw error}e.textContent="Supabase Terhubung";e.style.background="#e7f4eb";e.style.color="#27763e";$("#statSystem").textContent="OK"}
 async function loadCategories(){const {data,error}=await db.from("amasa_categories").select("id,name,slug,description,sort_order,is_active").order("sort_order",{ascending:true});if(error)return toast(error.message);categories=data||[];const a=categories.filter(x=>x.is_active);$("#statCategories").textContent=a.length;$("#categoriesList").innerHTML=a.length?a.map(x=>'<div class="category-item"><strong>'+esc(x.name)+'</strong><span>'+esc(x.slug)+'</span></div>').join(""):'<div class="empty">Belum ada kategori.</div>';$("#productCategory").innerHTML='<option value="">Pilih kategori</option>'+a.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join("");$("#productCategoryFilter").innerHTML='<option value="">Semua kategori</option>'+a.map(x=>'<option value="'+esc(x.slug)+'">'+esc(x.name)+'</option>').join("")}
 async function loadProducts(){const {data,error}=await db.from("amasa_products").select("id,category_id,name,slug,sku,short_description,description,image_url,price,size_label,badge,usage_instructions,safety_information,sort_order,is_active,is_featured,amasa_categories(name,slug)").order("sort_order",{ascending:true}).order("name",{ascending:true});if(error){$("#productsTableBody").innerHTML='<tr><td colspan="5" class="empty">'+esc(error.message)+'</td></tr>';return}products=data||[];renderProducts();$("#statProducts").textContent=products.length;$("#statActive").textContent=products.filter(x=>x.is_active).length}
@@ -18,4 +31,4 @@ function closeModal(){$("#productModal").hidden=true}$$("[data-close]").forEach(
 $("#productForm").onsubmit=async e=>{e.preventDefault();const id=$("#productId").value,p={name:$("#productName").value.trim(),slug:$("#productSlug").value.trim(),category_id:$("#productCategory").value||null,price:$("#productPrice").value?Number($("#productPrice").value):null,size_label:$("#productSize").value.trim()||null,badge:$("#productBadge").value.trim()||null,short_description:$("#productShort").value.trim()||null,description:$("#productDescription").value.trim()||null,usage_instructions:$("#productUsage").value.trim()||null,safety_information:$("#productSafety").value.trim()||null,sort_order:Number($("#productOrder").value||0),is_featured:$("#productFeatured").checked,is_active:$("#productActive").checked};const r=id?await db.from("amasa_products").update(p).eq("id",id):await db.from("amasa_products").insert(p);if(r.error)return toast(r.error.message);closeModal();toast(id?"Produk berhasil diperbarui.":"Produk berhasil ditambahkan.");loadProducts()};
 async function removeProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p||!confirm('Hapus produk "'+p.name+'"?'))return;const {error}=await db.from("amasa_products").delete().eq("id",id);if(error)return toast(error.message);toast("Produk berhasil dihapus.");loadProducts()}
 $("#productSearch").oninput=renderProducts;$("#productCategoryFilter").onchange=renderProducts;$("#logoutButton").onclick=async()=>{await db.auth.signOut();location.href="login.html"};$("#saveSettings").onclick=()=>toast("Pengaturan belum dibuat di Supabase.");
-(async()=>{if(await requireSession()){try{await check();await loadCategories();await loadProducts()}catch(e){console.error(e)}}})();
+(async()=>{if(await requireAdmin()){try{await check();await loadCategories();await loadProducts()}catch(e){console.error(e)}}})();
