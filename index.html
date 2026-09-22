@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AMASA Admin — Dashboard</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-name">AMASA</div>
+        <div class="brand-sub">ADMIN PANEL</div>
+      </div>
+
+      <nav class="side-nav">
+        <button class="nav-item active" data-page="dashboard">Dashboard</button>
+        <button class="nav-item" data-page="products">Produk</button>
+        <button class="nav-item" data-page="categories">Kategori</button>
+        <button class="nav-item" data-page="content">Konten Website</button>
+        <button class="nav-item" data-page="settings">Pengaturan</button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <button class="nav-item danger" id="logoutButton">Keluar</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobileMenu">☰</button>
+        <div>
+          <div class="eyebrow">PT ADIIMASA DISTRIBUSI INDONESIA</div>
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+        <div class="api-status" id="apiStatus">Supabase belum dicek</div>
+      </header>
+
+      <section class="page active" id="page-dashboard">
+        <div class="welcome-card">
+          <div>
+            <span class="eyebrow">AMASA WEBSITE</span>
+            <h2>Pusat Pengelolaan Website</h2>
+            <p>Kelola produk, kategori, dan konten website dari satu tempat.</p>
+          </div>
+          <button class="primary" data-go="products">Kelola Produk</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card"><span>Total Produk</span><strong id="statProducts">—</strong></div>
+          <div class="stat-card"><span>Kategori</span><strong id="statCategories">—</strong></div>
+          <div class="stat-card"><span>Produk Aktif</span><strong id="statActive">—</strong></div>
+          <div class="stat-card"><span>Status Sistem</span><strong id="statSystem">—</strong></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div><h3>Alur Sistem</h3><p>Website AMASA terhubung langsung ke Supabase.</p></div>
+          </div>
+          <div class="system-flow">
+            <div>Website</div><span>→</span><div>Admin AMASA</div><span>→</span><div>Supabase</div><span>→</span><div>Database</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-products">
+        <div class="page-head">
+          <div><span class="eyebrow">CATALOG</span><h2>Produk</h2><p>Tambah, edit, aktifkan, atau nonaktifkan produk AMASA.</p></div>
+          <button class="primary" id="addProductButton">+ Tambah Produk</button>
+        </div>
+        <div class="toolbar">
+          <input id="productSearch" type="search" placeholder="Cari nama produk...">
+          <select id="productCategoryFilter"><option value="">Semua kategori</option></select>
+        </div>
+        <div class="panel table-wrap">
+          <table><thead><tr><th>Produk</th><th>Kategori</th><th>Harga</th><th>Status</th><th>Aksi</th></tr></thead>
+          <tbody id="productsTableBody"><tr><td colspan="5" class="empty">Memuat produk...</td></tr></tbody></table>
+        </div>
+      </section>
+
+      <section class="page" id="page-categories">
+        <div class="page-head"><div><span class="eyebrow">CATALOG</span><h2>Kategori</h2><p>Kategori yang digunakan pada katalog produk.</p></div></div>
+        <div class="panel"><div id="categoriesList" class="category-list"><div class="empty">Memuat kategori...</div></div></div>
+      </section>
+
+      <section class="page" id="page-content">
+        <div class="page-head"><div><span class="eyebrow">CONTENT</span><h2>Konten Website</h2><p>Struktur untuk Hero, galeri, video, testimoni, dan FAQ akan dikembangkan di tahap berikutnya.</p></div></div>
+        <div class="content-grid">
+          <div class="content-card"><strong>Hero</strong><span>Siap dikembangkan</span></div>
+          <div class="content-card"><strong>Galeri</strong><span>Siap dikembangkan</span></div>
+          <div class="content-card"><strong>Video</strong><span>Siap dikembangkan</span></div>
+          <div class="content-card"><strong>Testimoni</strong><span>Siap dikembangkan</span></div>
+          <div class="content-card"><strong>FAQ</strong><span>Siap dikembangkan</span></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-settings">
+        <div class="page-head"><div><span class="eyebrow">SYSTEM</span><h2>Pengaturan</h2><p>Pengaturan kontak dan identitas website akan dihubungkan ke database.</p></div></div>
+        <div class="panel settings-panel">
+          <label>Nama Brand<input value="AMASA" id="settingBrand"></label>
+          <label>Nama Perusahaan<input value="PT Adiimasa Distribusi Indonesia" id="settingCompany"></label>
+          <label>Nomor WhatsApp<input placeholder="628xxxxxxxxxx" id="settingWhatsapp"></label>
+          <label>Email<input placeholder="email@domain.com" id="settingEmail"></label>
+          <button class="primary" id="saveSettings">Simpan Pengaturan</button>
+          <div class="notice">Pengaturan website akan dihubungkan ke tabel settings AMASA pada tahap berikutnya.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="productModal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-box">
+      <button class="modal-close" data-close>×</button>
+      <div class="modal-head"><span class="eyebrow">PRODUCT</span><h2 id="modalTitle">Tambah Produk</h2></div>
+      <form id="productForm">
+        <input type="hidden" id="productId">
+        <div class="form-grid">
+          <label>Nama Produk*<input id="productName" required></label>
+          <label>Slug*<input id="productSlug" required placeholder="contoh-nama-produk"></label>
+          <label>Kategori<select id="productCategory"></select></label>
+          <label>Harga<input id="productPrice" type="number" min="0" step="1" placeholder="17000"></label>
+          <label>Ukuran<input id="productSize" placeholder="100 ml"></label>
+          <label>Badge<input id="productBadge" placeholder="HOME CARE"></label>
+          <label class="full">Deskripsi Singkat<textarea id="productShort" rows="3"></textarea></label>
+          <label class="full">Deskripsi Lengkap<textarea id="productDescription" rows="5"></textarea></label>
+          <label class="full">Cara Penggunaan<textarea id="productUsage" rows="4"></textarea></label>
+          <label class="full">Informasi Keamanan<textarea id="productSafety" rows="4"></textarea></label>
+          <label>Urutan<input id="productOrder" type="number" value="0"></label>
+          <label class="check-row"><input id="productFeatured" type="checkbox"> Produk unggulan</label>
+          <label class="check-row"><input id="productActive" type="checkbox" checked> Produk aktif</label>
+        </div>
+        <div class="form-actions"><button type="button" class="secondary" data-close>Batal</button><button type="submit" class="primary" id="saveProduct">Simpan Produk</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
