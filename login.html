@@ -4,6 +4,30 @@
 .login-logo{font-size:30px;font-weight:900;letter-spacing:.18em;color:#102437}.login-sub{font-size:10px;font-weight:900;letter-spacing:.16em;color:#b58a50;margin-top:5px}.login-card h1{margin:30px 0 8px}.login-card p{color:#6b7785;font-size:13px}.login-form{display:grid;gap:15px;margin-top:25px}.login-form label{display:grid;gap:7px;font-size:12px;font-weight:800}.login-form input{width:100%;padding:12px;border:1px solid #e2e7eb;border-radius:8px}.login-form button{border:0;border-radius:8px;padding:12px;background:#b58a50;color:#fff;font-weight:800}.login-msg{font-size:12px;color:#b83b3b;min-height:18px}
 </style></head><body><main class="login-page"><section class="login-card"><div class="login-logo">AMASA</div><div class="login-sub">ADMIN PANEL</div><h1>Masuk Admin</h1><p>Gunakan akun Supabase yang sudah diberi akses admin AMASA.</p><form class="login-form" id="loginForm"><label>Email<input id="email" type="email" autocomplete="username" required></label><label>Password<input id="password" type="password" autocomplete="current-password" required></label><button type="submit">Masuk</button><div class="login-msg" id="msg"></div></form></section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
 const db=supabase.createClient("https://fysaxpqpqexjnlpkbwap.supabase.co","sb_publishable_DWRaEZTcNMjhglwN3nqCOw_pua8rsjD");
-(async()=>{const {data}=await db.auth.getSession();if(data.session)location.href="index.html"})();
-document.getElementById("loginForm").onsubmit=async e=>{e.preventDefault();const msg=document.getElementById("msg");msg.textContent="Memproses...";const {error}=await db.auth.signInWithPassword({email:document.getElementById("email").value.trim(),password:document.getElementById("password").value});if(error){msg.textContent=error.message;return}location.href="index.html"};
+async function checkAdmin(){
+  const {data:{user},error:userError}=await db.auth.getUser();
+  if(userError||!user)return false;
+  const {data:admin,error}=await db.from("amasa_admins").select("user_id,role").eq("user_id",user.id).eq("role","admin").maybeSingle();
+  return !error&&!!admin;
+}
+(async()=>{
+  const {data:{session}}=await db.auth.getSession();
+  if(session){
+    if(await checkAdmin()) location.href="index.html";
+    else await db.auth.signOut();
+  }
+})();
+document.getElementById("loginForm").onsubmit=async e=>{
+  e.preventDefault();
+  const msg=document.getElementById("msg");
+  msg.textContent="Memproses...";
+  const {error}=await db.auth.signInWithPassword({email:document.getElementById("email").value.trim(),password:document.getElementById("password").value});
+  if(error){msg.textContent=error.message;return}
+  if(!(await checkAdmin())){
+    await db.auth.signOut();
+    msg.textContent="Akses ditolak. Akun ini belum diberi role admin AMASA.";
+    return;
+  }
+  location.href="index.html";
+};
 </script></body></html>
