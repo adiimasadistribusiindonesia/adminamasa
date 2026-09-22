@@ -1,48 +1,26 @@
 <!doctype html>
-<html lang="id">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AMASA Admin - Reset Password</title>
-<link rel="stylesheet" href="admin.css">
-</head>
-<body>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AMASA Admin — Reset Password</title><link rel="stylesheet" href="admin.css"><style>
+.login-page{min-height:100vh;display:grid;place-items:center;padding:25px;background:linear-gradient(135deg,#0b1928,#244966)}
+.login-card{width:min(430px,94vw);background:#fff;border-radius:16px;padding:35px;box-shadow:0 30px 80px #0005}
+.login-logo{font-size:30px;font-weight:900;letter-spacing:.18em;color:#102437}.login-sub{font-size:10px;font-weight:900;letter-spacing:.16em;color:#b58a50;margin-top:5px}.login-card h1{margin:30px 0 8px}.login-card p{color:#6b7785;font-size:13px}.login-form{display:grid;gap:15px;margin-top:25px}.login-form label{display:grid;gap:7px;font-size:12px;font-weight:800}.login-form input{width:100%;padding:12px;border:1px solid #e2e7eb;border-radius:8px}.login-form button{border:0;border-radius:8px;padding:12px;background:#b58a50;color:#fff;font-weight:800;cursor:pointer}.login-form button.login-link{background:transparent;color:#8d6b3e;padding:4px}.login-msg{font-size:12px;color:#b83b3b;min-height:18px}.login-msg.ok{color:#27763e}.hidden{display:none!important}
+</style></head><body>
 <main class="login-page"><section class="login-card">
 <div class="login-logo">AMASA</div><div class="login-sub">ADMIN PANEL</div>
 <h1 id="title">Lupa Password</h1><p id="desc">Masukkan email akun Admin AMASA untuk menerima link reset password.</p>
 <form id="resetForm" class="login-form">
 <label id="emailWrap">Email<input id="email" type="email" required></label>
-<label id="passWrap" hidden>Password Baru<input id="password" type="password" minlength="6"></label>
-<label id="confirmWrap" hidden>Ulangi Password<input id="confirm" type="password" minlength="6"></label>
+<label id="passWrap" class="hidden">Password Baru<input id="password" type="password" minlength="6"></label>
+<label id="confirmWrap" class="hidden">Ulangi Password<input id="confirm" type="password" minlength="6"></label>
 <button id="submit" type="submit">Kirim Link Reset</button>
-<button type="button" onclick="location.href='login.html'">Kembali ke Login</button>
+<button type="button" class="login-link" onclick="location.href='login.html'">Kembali ke Login</button>
 <div id="msg" class="login-msg"></div>
 </form>
 </section></main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
 const db=supabase.createClient("https://fysaxpqpqexjnlpkbwap.supabase.co","sb_publishable_DWRaEZTcNMjhglwN3nqCOw_pua8rsjD");
 const form=document.getElementById("resetForm"),msg=document.getElementById("msg");
 let recovery=false;
-function setRecovery(){recovery=true;document.getElementById("emailWrap").hidden=true;document.getElementById("passWrap").hidden=false;document.getElementById("confirmWrap").hidden=false;document.getElementById("title").textContent="Password Baru";document.getElementById("desc").textContent="Buat password baru untuk akun Admin AMASA.";document.getElementById("submit").textContent="Simpan Password Baru";}
+function setRecovery(){recovery=true;document.getElementById("emailWrap").classList.add("hidden");document.getElementById("passWrap").classList.remove("hidden");document.getElementById("confirmWrap").classList.remove("hidden");document.getElementById("title").textContent="Password Baru";document.getElementById("desc").textContent="Buat password baru untuk akun Admin AMASA.";document.getElementById("submit").textContent="Simpan Password Baru";}
 db.auth.onAuthStateChange((event,session)=>{if(event==="PASSWORD_RECOVERY"&&session)setRecovery();});
-form.onsubmit=async e=>{
- e.preventDefault();
- if(!recovery){
-   msg.textContent="Mengirim link reset...";
-   const {error}=await db.auth.resetPasswordForEmail(document.getElementById("email").value.trim(),{redirectTo:location.origin+location.pathname});
-   msg.textContent=error?error.message:"Link reset sudah dikirim. Silakan cek Gmail/spam.";
- }else{
-   const p=document.getElementById("password").value,c=document.getElementById("confirm").value;
-   if(p!==c){msg.textContent="Password tidak sama.";return;}
-   if(p.length<6){msg.textContent="Password minimal 6 karakter.";return;}
-   msg.textContent="Menyimpan...";
-   const {error}=await db.auth.updateUser({password:p});
-   if(error){msg.textContent=error.message;return;}
-   await db.auth.signOut();
-   msg.textContent="Password berhasil diubah. Silakan login kembali.";
-   setTimeout(()=>location.href="login.html",1200);
- }
-};
-</script>
-</body></html>
+form.onsubmit=async e=>{e.preventDefault();if(!recovery){msg.textContent="Mengirim link reset...";const {error}=await db.auth.resetPasswordForEmail(document.getElementById("email").value.trim(),{redirectTo:location.origin+location.pathname});msg.textContent=error?error.message:"Link reset sudah dikirim. Silakan cek Gmail/spam."}else{const p=document.getElementById("password").value,c=document.getElementById("confirm").value;if(p!==c){msg.textContent="Password tidak sama.";return}if(p.length<6){msg.textContent="Password minimal 6 karakter.";return}msg.textContent="Menyimpan...";const {error}=await db.auth.updateUser({password:p});if(error){msg.textContent=error.message;return}await db.auth.signOut();msg.className="login-msg ok";msg.textContent="Password berhasil diubah. Silakan login kembali.";setTimeout(()=>location.href="login.html",1200)}};
+</script></body></html>
