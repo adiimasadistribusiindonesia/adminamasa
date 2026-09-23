@@ -259,15 +259,23 @@ function openContentModal(item){
   $("#aboutParagraph1Wrap").hidden=item.section_slug!=="about";
   $("#aboutParagraph2Wrap").hidden=item.section_slug!=="about";
   $("#contentImage").value="";
+  document.querySelectorAll(".gallery-file").forEach(x=>{x.value="";x.dataset.currentUrl=""});
+  document.querySelectorAll(".gallery-preview").forEach(x=>{x.hidden=true;x.removeAttribute("src")});
+  document.querySelectorAll(".gallery-info").forEach(x=>x.textContent="Belum ada foto");
   $("#contentImageInfo").textContent=item.image_url?"Gambar saat ini tersimpan. Pilih file baru untuk menggantinya.":"JPG, PNG, WEBP. Maksimal 5 MB.";
   $("#contentImagePreview").src=item.image_url||"";
   $("#contentImagePreview").hidden=!item.image_url;
   $("#contentImage").dataset.currentUrl=item.image_url||"";
   $("#contentActive").checked=!!item.is_active;
+  const isGallery=item.section_slug==="gallery";
+  $("#contentBodyWrap").hidden=isGallery || item.section_slug==="about";
+  $("#galleryImagesWrap").hidden=!isGallery;
+  if(isGallery){let g={};try{g=JSON.parse(item.content||"{}")}catch(e){};const items=Array.isArray(g.items)?g.items:[];items.slice(0,4).forEach((v,n)=>{const input=document.querySelector(`.gallery-file[data-slot="${n}"]`);const img=document.querySelector(`.gallery-preview[data-preview="${n}"]`);const info=document.querySelector(`.gallery-info[data-info="${n}"]`);if(input)input.dataset.currentUrl=v.image_url||"";if(img&&v.image_url){img.src=v.image_url;img.hidden=false}if(info)info.textContent=v.image_url?"Gambar tersimpan. Pilih file baru untuk menggantinya.":"Belum ada foto"})}
 }
 function closeContentModal(){$("#contentModal").hidden=true}
 document.querySelectorAll("[data-content-close]").forEach(b=>b.onclick=closeContentModal);
-$("#contentImage").onchange=()=>{const f=$("#contentImage").files[0];if(!f)return;if(!f.type.startsWith("image/")){toast("File harus berupa gambar.");$("#contentImage").value="";return}if(f.size>5*1024*1024){toast("Ukuran gambar maksimal 5 MB.");$("#contentImage").value="";return}$("#contentImagePreview").src=URL.createObjectURL(f);$("#contentImagePreview").hidden=false;$("#contentImageInfo").textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
+$("#contentImage").onchange=()=>{const f=$("#contentImage").files[0];if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");$("#contentImage").value="";return}$("#contentImagePreview").src=URL.createObjectURL(f);$("#contentImagePreview").hidden=false;$("#contentImageInfo").textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
+document.querySelectorAll(".gallery-file").forEach(input=>input.onchange=()=>{const f=input.files[0],n=input.dataset.slot;if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");input.value="";return}const img=document.querySelector(`.gallery-preview[data-preview="${n}"]`),info=document.querySelector(`.gallery-info[data-info="${n}"]`);if(img){img.src=URL.createObjectURL(f);img.hidden=false}if(info)info.textContent=f.name+" • "+Math.round(f.size/1024)+" KB"});
 async function uploadContentImage(file,sectionSlug){const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";const path="content/"+sectionSlug+"/"+crypto.randomUUID()+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"image/jpeg"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
 function itemSectionSlug(id){const card=document.querySelector('[data-content-edit="'+id+'"]');return card?.dataset.sectionSlug||"";}
 $("#contentForm").onsubmit=async e=>{
@@ -285,6 +293,12 @@ $("#contentForm").onsubmit=async e=>{
       is_active:$("#contentActive").checked,
       updated_at:new Date().toISOString()
     };
+    if($("#contentSectionName").value==="Galeri"){
+      let old={};try{old=JSON.parse(document.querySelector('[data-content-edit="'+id+'"]')?.dataset.gallery||"{}")}catch(e){}
+      const oldItems=Array.isArray(old.items)?old.items:[];const items=[];
+      for(let n=0;n<4;n++){const input=document.querySelector(`.gallery-file[data-slot="${n}"]`);const url=input?.files[0]?await uploadContentImage(input.files[0],"gallery"):input?.dataset.currentUrl||oldItems[n]?.image_url||"";if(url)items.push({image_url:url,label:oldItems[n]?.label||("PRODUCT GALLERY 0"+(n+1))});}
+      p.content=JSON.stringify({items});p.image_url=null;
+    }
     if($("#contentSectionName").value==="Tentang AMASA"){
       p.content=JSON.stringify({
         paragraph1:$("#aboutParagraph1").value.trim(),
