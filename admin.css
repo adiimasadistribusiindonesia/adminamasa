@@ -86,3 +86,6 @@ button{cursor:pointer}
   .topbar>div:nth-child(2){margin:0;min-width:0}
   .topbar h1{font-size:20px;margin:2px 0 0}
 }
+
+
+.gallery-admin-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px;margin-bottom:12px}.gallery-admin-item{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:8px}.gallery-admin-item>span{font-weight:700}.gallery-admin-item .gallery-info{min-height:16px}.gallery-admin-item .product-image-preview{max-width:160px;max-height:120px;object-fit:cover;border-radius:8px}.gallery-admin-item .gallery-remove{align-self:flex-start}@media(max-width:600px){.gallery-admin-list{grid-template-columns:1fr}}
