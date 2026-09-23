@@ -280,7 +280,6 @@ $("#contentForm").onsubmit=async e=>{
       image_url:$("#contentImage").dataset.currentUrl||null,
       button_text:null,
       button_url:null,
-      sort_order:item.sort_order,
       is_active:$("#contentActive").checked,
       updated_at:new Date().toISOString()
     };
