@@ -245,7 +245,11 @@ function openContentModal(item){
   $("#contentTitle").value=item.title||"";
   $("#contentSubtitle").value=item.subtitle||"";
   $("#contentBody").value=item.content||"";
-  $("#contentImage").value=item.image_url||"";
+  $("#contentImage").value="";
+  $("#contentImageInfo").textContent=item.image_url?"Gambar saat ini tersimpan. Pilih file baru untuk menggantinya.":"JPG, PNG, WEBP. Maksimal 5 MB.";
+  $("#contentImagePreview").src=item.image_url||"";
+  $("#contentImagePreview").hidden=!item.image_url;
+  $("#contentImage").dataset.currentUrl=item.image_url||"";
   $("#contentButtonText").value=item.button_text||"";
   $("#contentButtonUrl").value=item.button_url||"";
   $("#contentOrder").value=item.sort_order??0;
@@ -253,6 +257,8 @@ function openContentModal(item){
 }
 function closeContentModal(){$("#contentModal").hidden=true}
 document.querySelectorAll("[data-content-close]").forEach(b=>b.onclick=closeContentModal);
+$("#contentImage").onchange=()=>{const f=$("#contentImage").files[0];if(!f)return;if(!f.type.startsWith("image/")){toast("File harus berupa gambar.");$("#contentImage").value="";return}if(f.size>5*1024*1024){toast("Ukuran gambar maksimal 5 MB.");$("#contentImage").value="";return}$("#contentImagePreview").src=URL.createObjectURL(f);$("#contentImagePreview").hidden=false;$("#contentImageInfo").textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
+async function uploadContentImage(file,sectionSlug){const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";const path="content/"+sectionSlug+"/"+crypto.randomUUID()+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"image/jpeg"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
 $("#contentForm").onsubmit=async e=>{
   e.preventDefault();
   const id=$("#contentId").value,saveBtn=$("#saveContent");
@@ -262,13 +268,17 @@ $("#contentForm").onsubmit=async e=>{
       title:$("#contentTitle").value.trim()||null,
       subtitle:$("#contentSubtitle").value.trim()||null,
       content:$("#contentBody").value.trim()||null,
-      image_url:$("#contentImage").value.trim()||null,
+      image_url:$("#contentImage").dataset.currentUrl||null,
       button_text:$("#contentButtonText").value.trim()||null,
       button_url:$("#contentButtonUrl").value.trim()||null,
       sort_order:Number($("#contentOrder").value||0),
       is_active:$("#contentActive").checked,
       updated_at:new Date().toISOString()
     };
+    const file=$("#contentImage").files[0];
+    if(file){
+      p.image_url=await uploadContentImage(file,($("#contentSectionName").value||"content").toLowerCase().replace(/[^a-z0-9]+/g,"-"));
+    }
     const r=await db.from("amasa_site_content").update(p).eq("id",id);
     if(r.error)throw r.error;
     closeContentModal();toast("Konten berhasil diperbarui.");await loadWebsiteContent();
