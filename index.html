@@ -90,13 +90,11 @@
       </section>
 
       <section class="page" id="page-content">
-        <div class="page-head"><div><span class="eyebrow">CONTENT</span><h2>Konten Website</h2><p>Struktur untuk Hero, galeri, video, testimoni, dan FAQ akan dikembangkan di tahap berikutnya.</p></div></div>
-        <div class="content-grid">
-          <div class="content-card"><strong>Hero</strong><span>Siap dikembangkan</span></div>
-          <div class="content-card"><strong>Galeri</strong><span>Siap dikembangkan</span></div>
-          <div class="content-card"><strong>Video</strong><span>Siap dikembangkan</span></div>
-          <div class="content-card"><strong>Testimoni</strong><span>Siap dikembangkan</span></div>
-          <div class="content-card"><strong>FAQ</strong><span>Siap dikembangkan</span></div>
+        <div class="page-head">
+          <div><span class="eyebrow">CONTENT</span><h2>Konten Website</h2><p>Kelola konten utama yang tampil pada website AMASA.</p></div>
+        </div>
+        <div class="content-grid" id="contentGrid">
+          <div class="content-card"><strong>Memuat...</strong><span>Konten Website</span></div>
         </div>
       </section>
 
@@ -158,6 +156,30 @@
           <label class="check-row"><input id="categoryActive" type="checkbox" checked> Kategori aktif</label>
         </div>
         <div class="form-actions"><button type="button" class="secondary" data-category-close>Batal</button><button type="submit" class="primary" id="saveCategory">Simpan Kategori</button></div>
+      </form>
+    </div>
+  </div>
+
+
+  <div class="modal" id="contentModal" hidden>
+    <div class="modal-backdrop" data-content-close></div>
+    <div class="modal-box">
+      <button class="modal-close" data-content-close>×</button>
+      <div class="modal-head"><span class="eyebrow">WEBSITE CONTENT</span><h2 id="contentModalTitle">Edit Konten</h2></div>
+      <form id="contentForm">
+        <input type="hidden" id="contentId">
+        <div class="form-grid">
+          <label>Nama Bagian<input id="contentSectionName" readonly></label>
+          <label>Judul<input id="contentTitle"></label>
+          <label class="full">Subjudul / Label<input id="contentSubtitle"></label>
+          <label class="full">Isi Konten<textarea id="contentBody" rows="7"></textarea></label>
+          <label>URL Gambar<input id="contentImage" placeholder="https://..."></label>
+          <label>Teks Tombol<input id="contentButtonText"></label>
+          <label>URL Tombol<input id="contentButtonUrl" placeholder="#produk atau https://..."></label>
+          <label>Urutan<input id="contentOrder" type="number" value="0"></label>
+          <label class="check-row"><input id="contentActive" type="checkbox" checked> Konten aktif</label>
+        </div>
+        <div class="form-actions"><button type="button" class="secondary" data-content-close>Batal</button><button type="submit" class="primary" id="saveContent">Simpan Konten</button></div>
       </form>
     </div>
   </div>
