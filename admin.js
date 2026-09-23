@@ -232,7 +232,7 @@ async function loadWebsiteContent(){
   if(error)return toast(error.message);
   const grid=$("#contentGrid");
   if(!grid)return;
-  const items=data||[];
+  const items=(data||[]).filter(x=>x.section_slug!=="settings");
   grid.innerHTML=items.length?items.map(x=>'<button type="button" class="content-card" data-content-edit="'+x.id+'"><strong>'+esc(x.section_name)+'</strong><span>'+esc(x.title||"Belum diatur")+'</span><small class="muted">'+(x.is_active?"Aktif":"Nonaktif")+'</small></button>').join(""):'<div class="empty">Belum ada konten website.</div>';
   document.querySelectorAll("[data-content-edit]").forEach(b=>b.onclick=()=>openContentModal(items.find(x=>String(x.id)===String(b.dataset.contentEdit))));
 }
