@@ -261,7 +261,8 @@ function openContentModal(item){
   const isGallery=item.section_slug==="gallery";$("#contentBodyWrap").hidden=isGallery||item.section_slug==="about";$("#galleryImagesWrap").hidden=!isGallery;$("#contentImageWrap").hidden=isGallery;
   if(isGallery){let g={};try{g=JSON.parse(item.content||"{}")}catch(e){}let items=Array.isArray(g.items)?g.items:[];if(!items.length&&item.image_url)items=[{image_url:item.image_url,label:"PRODUCT GALLERY 01"}];renderGalleryAdmin(items)}else $("#galleryAdminList").innerHTML="";
 }
-$("#addGalleryImage").onclick=addGalleryAdminSlot;\nfunction closeContentModal(){$("#contentModal").hidden=true}
+$("#addGalleryImage").onclick=addGalleryAdminSlot;
+function closeContentModal(){$("#contentModal").hidden=true}
 document.querySelectorAll("[data-content-close]").forEach(b=>b.onclick=closeContentModal);
 $("#contentImage").onchange=()=>{const f=$("#contentImage").files[0];if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");$("#contentImage").value="";return}$("#contentImagePreview").src=URL.createObjectURL(f);$("#contentImagePreview").hidden=false;$("#contentImageInfo").textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
 document.querySelectorAll(".gallery-file").forEach(input=>input.onchange=()=>{const f=input.files[0],n=input.dataset.slot;if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");input.value="";return}const img=document.querySelector(`.gallery-preview[data-preview="${n}"]`),info=document.querySelector(`.gallery-info[data-info="${n}"]`);if(img){img.src=URL.createObjectURL(f);img.hidden=false}if(info)info.textContent=f.name+" • "+Math.round(f.size/1024)+" KB"});
