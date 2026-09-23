@@ -245,6 +245,18 @@ function openContentModal(item){
   $("#contentTitle").value=item.title||"";
   $("#contentSubtitle").value=item.subtitle||"";
   $("#contentBody").value=item.content||"";
+  $("#aboutParagraph1").value="";
+  $("#aboutParagraph2").value="";
+  if(item.section_slug==="about"){
+    try{
+      const about=JSON.parse(item.content||"{}");
+      $("#aboutParagraph1").value=about.paragraph1||"";
+      $("#aboutParagraph2").value=about.paragraph2||"";
+    }catch(e){}
+  }
+  $("#contentBodyWrap").hidden=item.section_slug==="about";
+  $("#aboutParagraph1Wrap").hidden=item.section_slug!=="about";
+  $("#aboutParagraph2Wrap").hidden=item.section_slug!=="about";
   $("#contentImage").value="";
   $("#contentImageInfo").textContent=item.image_url?"Gambar saat ini tersimpan. Pilih file baru untuk menggantinya.":"JPG, PNG, WEBP. Maksimal 5 MB.";
   $("#contentImagePreview").src=item.image_url||"";
@@ -275,6 +287,12 @@ $("#contentForm").onsubmit=async e=>{
       is_active:$("#contentActive").checked,
       updated_at:new Date().toISOString()
     };
+    if($("#contentSectionName").value==="Tentang AMASA"){
+      p.content=JSON.stringify({
+        paragraph1:$("#aboutParagraph1").value.trim(),
+        paragraph2:$("#aboutParagraph2").value.trim()
+      });
+    }
     const file=$("#contentImage").files[0];
     if(file){
       p.image_url=await uploadContentImage(file,($("#contentSectionName").value||"content").toLowerCase().replace(/[^a-z0-9]+/g,"-"));
