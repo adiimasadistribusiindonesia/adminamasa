@@ -107,5 +107,53 @@ async function uploadProductImage(file,productId){const ext=(file.name.split("."
 $("#productForm").onsubmit=async e=>{e.preventDefault();const id=$("#productId").value;const saveBtn=$("#saveProduct");saveBtn.disabled=true;saveBtn.textContent="Menyimpan...";try{const p={name:$("#productName").value.trim(),slug:$("#productSlug").value.trim(),category_id:$("#productCategory").value||null,price:$("#productPrice").value?Number($("#productPrice").value):null,size_label:$("#productSize").value.trim()||null,badge:$("#productBadge").value.trim()||null,short_description:$("#productShort").value.trim()||null,description:$("#productDescription").value.trim()||null,usage_instructions:$("#productUsage").value.trim()||null,safety_information:$("#productSafety").value.trim()||null,sort_order:Number($("#productOrder").value||0),is_featured:$("#productFeatured").checked,is_active:$("#productActive").checked};let productId=id;if(!productId){const r=await db.from("amasa_products").insert(p).select("id").single();if(r.error)throw r.error;productId=r.data.id}else{const r=await db.from("amasa_products").update(p).eq("id",productId);if(r.error)throw r.error}const file=$("#productImage").files[0];if(file){const imageUrl=await uploadProductImage(file,productId);const r=await db.from("amasa_products").update({image_url:imageUrl}).eq("id",productId);if(r.error)throw r.error}closeModal();toast(id?"Produk berhasil diperbarui.":"Produk berhasil ditambahkan.");await loadProducts()}catch(err){toast(err?.message||"Gagal menyimpan produk.")}finally{saveBtn.disabled=false;saveBtn.textContent="Simpan Produk"}};
 async function removeProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p||!confirm('Hapus produk "'+p.name+'"?'))return;const {error}=await db.from("amasa_products").delete().eq("id",id);if(error)return toast(error.message);toast("Produk berhasil dihapus.");loadProducts()}
 $("#productSearch").oninput=renderProducts;$("#productCategoryFilter").onchange=renderProducts;$("#logoutButton").onclick=async()=>{await db.auth.signOut();location.href="login.html"};$("#saveSettings").onclick=()=>toast("Pengaturan belum dibuat di Supabase.");
-(async()=>{if(await requireAdmin()){try{await check();await loadCategories();await loadProducts()}catch(e){console.error(e)}}})();
+async function loadWebsiteContent(){
+  const {data,error}=await db.from("amasa_site_content").select("id,section_slug,section_name,title,subtitle,content,image_url,button_text,button_url,sort_order,is_active").order("sort_order",{ascending:true});
+  if(error)return toast(error.message);
+  const grid=$("#contentGrid");
+  if(!grid)return;
+  const items=data||[];
+  grid.innerHTML=items.length?items.map(x=>'<button type="button" class="content-card" data-content-edit="'+x.id+'"><strong>'+esc(x.section_name)+'</strong><span>'+esc(x.title||"Belum diatur")+'</span><small class="muted">'+(x.is_active?"Aktif":"Nonaktif")+'</small></button>').join(""):'<div class="empty">Belum ada konten website.</div>';
+  document.querySelectorAll("[data-content-edit]").forEach(b=>b.onclick=()=>openContentModal(items.find(x=>String(x.id)===String(b.dataset.contentEdit))));
+}
+function openContentModal(item){
+  if(!item)return;
+  $("#contentModal").hidden=false;
+  $("#contentModalTitle").textContent="Edit "+item.section_name;
+  $("#contentId").value=item.id;
+  $("#contentSectionName").value=item.section_name||"";
+  $("#contentTitle").value=item.title||"";
+  $("#contentSubtitle").value=item.subtitle||"";
+  $("#contentBody").value=item.content||"";
+  $("#contentImage").value=item.image_url||"";
+  $("#contentButtonText").value=item.button_text||"";
+  $("#contentButtonUrl").value=item.button_url||"";
+  $("#contentOrder").value=item.sort_order??0;
+  $("#contentActive").checked=!!item.is_active;
+}
+function closeContentModal(){$("#contentModal").hidden=true}
+document.querySelectorAll("[data-content-close]").forEach(b=>b.onclick=closeContentModal);
+$("#contentForm").onsubmit=async e=>{
+  e.preventDefault();
+  const id=$("#contentId").value,saveBtn=$("#saveContent");
+  saveBtn.disabled=true;saveBtn.textContent="Menyimpan...";
+  try{
+    const p={
+      title:$("#contentTitle").value.trim()||null,
+      subtitle:$("#contentSubtitle").value.trim()||null,
+      content:$("#contentBody").value.trim()||null,
+      image_url:$("#contentImage").value.trim()||null,
+      button_text:$("#contentButtonText").value.trim()||null,
+      button_url:$("#contentButtonUrl").value.trim()||null,
+      sort_order:Number($("#contentOrder").value||0),
+      is_active:$("#contentActive").checked,
+      updated_at:new Date().toISOString()
+    };
+    const r=await db.from("amasa_site_content").update(p).eq("id",id);
+    if(r.error)throw r.error;
+    closeContentModal();toast("Konten berhasil diperbarui.");await loadWebsiteContent();
+  }catch(err){toast(err?.message||"Gagal menyimpan konten.")}finally{saveBtn.disabled=false;saveBtn.textContent="Simpan Konten"}
+};
+
+(async()=>{if(await requireAdmin()){try{await check();await loadCategories();await loadProducts();await loadWebsiteContent()}catch(e){console.error(e)}}})();
 // mobile sidebar navigation fix
