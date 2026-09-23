@@ -21,6 +21,90 @@ async function requireAdmin(){
 }
 
 async function check(){const e=$("#apiStatus");const {error}=await db.from("amasa_products").select("id",{count:"exact",head:true});if(error){e.textContent="Supabase Error";$("#statSystem").textContent="OFF";throw error}e.textContent="Supabase Terhubung";e.style.background="#e7f4eb";e.style.color="#27763e";$("#statSystem").textContent="OK"}
+function formatDateKey(d){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,"0");
+  const day=String(d.getDate()).padStart(2,"0");
+  return y+"-"+m+"-"+day;
+}
+function formatDayLabel(key){
+  const parts=key.split("-");
+  return parts.length===3 ? parts[2]+"/"+parts[1] : key;
+}
+async function loadVisitorAnalytics(){
+  const visitorsEl=$("#analyticsVisitors"), pageviewsEl=$("#analyticsPageviews"), sessionsEl=$("#analyticsSessions");
+  const chart=$("#visitorChart"), empty=$("#visitorEmpty");
+  if(!visitorsEl||!pageviewsEl||!sessionsEl||!chart)return;
+
+  const today=new Date();
+  const start=new Date(today);
+  start.setDate(today.getDate()-6);
+  const startKey=formatDateKey(start);
+  const endKey=formatDateKey(today);
+
+  const {data,error}=await db.from("analytics_daily")
+    .select("analytics_date,total_visitors,unique_visitors,total_sessions,total_pageviews")
+    .eq("module_slug","AMASA")
+    .gte("analytics_date",startKey)
+    .lte("analytics_date",endKey)
+    .order("analytics_date",{ascending:true});
+
+  if(error){
+    console.error("AMASA analytics:",error);
+    return;
+  }
+
+  const byDate={};
+  (data||[]).forEach(row=>{byDate[row.analytics_date]=row});
+  const rows=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(start);
+    d.setDate(start.getDate()+i);
+    const key=formatDateKey(d);
+    rows.push({
+      key,
+      label:formatDayLabel(key),
+      visitors:Number(byDate[key]?.unique_visitors||0),
+      pageviews:Number(byDate[key]?.total_pageviews||0),
+      sessions:Number(byDate[key]?.total_sessions||0)
+    });
+  }
+
+  const totals=rows.reduce((a,r)=>({
+    visitors:a.visitors+r.visitors,
+    pageviews:a.pageviews+r.pageviews,
+    sessions:a.sessions+r.sessions
+  }),{visitors:0,pageviews:0,sessions:0});
+
+  visitorsEl.textContent=totals.visitors.toLocaleString("id-ID");
+  pageviewsEl.textContent=totals.pageviews.toLocaleString("id-ID");
+  sessionsEl.textContent=totals.sessions.toLocaleString("id-ID");
+
+  const max=Math.max(...rows.map(r=>r.visitors),1);
+  const width=900,height=280,left=48,right=18,top=22,bottom=42;
+  const plotW=width-left-right,plotH=height-top-bottom;
+  const points=rows.map((r,i)=>{
+    const x=left+(plotW*(i/(rows.length-1)));
+    const y=top+plotH-(r.visitors/max)*plotH;
+    return {x,y,r};
+  });
+  const path=points.map((p,i)=>(i?"L":"M")+p.x.toFixed(1)+" "+p.y.toFixed(1)).join(" ");
+  const area=path+" L "+points[points.length-1].x.toFixed(1)+" "+(top+plotH)+" L "+points[0].x.toFixed(1)+" "+(top+plotH)+" Z";
+  const grid=[0,.25,.5,.75,1].map(v=>{
+    const y=top+plotH-v*plotH;
+    return '<line x1="'+left+'" y1="'+y+'" x2="'+(width-right)+'" y2="'+y+'" class="chart-grid"></line>';
+  }).join("");
+  const labels=points.map(p=>'<text x="'+p.x+'" y="'+(height-13)+'" text-anchor="middle" class="chart-label">'+p.r.label+'</text>').join("");
+  const dots=points.map(p=>'<circle cx="'+p.x+'" cy="'+p.y+'" r="4" class="chart-dot"></circle>').join("");
+  chart.innerHTML=grid+
+    '<path d="'+area+'" class="chart-area"></path>'+
+    '<path d="'+path+'" class="chart-line"></path>'+
+    dots+labels;
+
+  if(empty) empty.hidden=totals.visitors+totals.pageviews+totals.sessions!==0;
+  chart.style.opacity=totals.visitors===0 ? "0.35" : "1";
+}
+
 async function loadCategories(){
   const {data,error}=await db.from("amasa_categories")
     .select("id,name,slug,description,sort_order,is_active")
@@ -184,5 +268,5 @@ $("#contentForm").onsubmit=async e=>{
   }catch(err){toast(err?.message||"Gagal menyimpan konten.")}finally{saveBtn.disabled=false;saveBtn.textContent="Simpan Konten"}
 };
 
-(async()=>{if(await requireAdmin()){try{await check();await loadCategories();await loadProducts();await loadWebsiteContent();await loadSettings()}catch(e){console.error(e)}}})();
+(async()=>{if(await requireAdmin()){try{await check();await loadCategories();await loadProducts();await loadWebsiteContent();await loadSettings();await loadVisitorAnalytics()}catch(e){console.error(e)}}})();
 // mobile sidebar navigation fix
