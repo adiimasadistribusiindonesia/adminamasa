@@ -270,6 +270,7 @@ function openContentModal(item){
   const isGallery=item.section_slug==="gallery";
   $("#contentBodyWrap").hidden=isGallery || item.section_slug==="about";
   $("#galleryImagesWrap").hidden=!isGallery;
+  $("#contentImageWrap").hidden=isGallery;
   if(isGallery){let g={};try{g=JSON.parse(item.content||"{}")}catch(e){};const items=Array.isArray(g.items)?g.items:[];items.slice(0,4).forEach((v,n)=>{const input=document.querySelector(`.gallery-file[data-slot="${n}"]`);const img=document.querySelector(`.gallery-preview[data-preview="${n}"]`);const info=document.querySelector(`.gallery-info[data-info="${n}"]`);if(input)input.dataset.currentUrl=v.image_url||"";if(img&&v.image_url){img.src=v.image_url;img.hidden=false}if(info)info.textContent=v.image_url?"Gambar tersimpan. Pilih file baru untuk menggantinya.":"Belum ada foto"})}
 }
 function closeContentModal(){$("#contentModal").hidden=true}
