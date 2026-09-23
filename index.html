@@ -163,7 +163,32 @@
   </div>
 
   <div class="toast" id="toast" hidden></div>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="admin.js?v=20260923-3"></script>
+  <script>
+    (function(){
+      function loadScript(src, done){
+        var s=document.createElement("script");
+        s.src=src;
+        s.onload=function(){done(true)};
+        s.onerror=function(){done(false)};
+        document.head.appendChild(s);
+      }
+      function startAdmin(){
+        if(window.supabase){
+          loadScript("admin.js?v=20260923-4", function(ok){
+            if(!ok) document.getElementById("apiStatus").textContent="Admin JS gagal dimuat";
+          });
+        }else{
+          document.getElementById("apiStatus").textContent="Supabase gagal dimuat";
+        }
+      }
+      loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2", function(ok){
+        if(ok) startAdmin();
+        else loadScript("https://unpkg.com/@supabase/supabase-js@2", function(ok2){
+          if(ok2) startAdmin();
+          else document.getElementById("apiStatus").textContent="Supabase gagal dimuat";
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
