@@ -20,7 +20,14 @@ async function requireAdmin(){
   return true;
 }
 
-async function check(){const e=$("#apiStatus");const {error}=await db.from("amasa_products").select("id",{count:"exact",head:true});if(error){e.textContent="Supabase Error";$("#statSystem").textContent="OFF";throw error}e.textContent="Supabase Terhubung";e.style.background="#e7f4eb";e.style.color="#27763e";$("#statSystem").textContent="OK"}
+async function check(){
+  const {error}=await db.from("amasa_products").select("id",{count:"exact",head:true});
+  if(error){
+    $("#statSystem").textContent="OFF";
+    throw error;
+  }
+  $("#statSystem").textContent="OK";
+}
 function formatDateKey(d){
   const y=d.getFullYear();
   const m=String(d.getMonth()+1).padStart(2,"0");
