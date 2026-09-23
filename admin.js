@@ -106,7 +106,46 @@ $("#productImage").onchange=()=>{const f=$("#productImage").files[0];if(!f){retu
 async function uploadProductImage(file,productId){const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";const path=productId+"/"+crypto.randomUUID()+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"image/jpeg"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
 $("#productForm").onsubmit=async e=>{e.preventDefault();const id=$("#productId").value;const saveBtn=$("#saveProduct");saveBtn.disabled=true;saveBtn.textContent="Menyimpan...";try{const p={name:$("#productName").value.trim(),slug:$("#productSlug").value.trim(),category_id:$("#productCategory").value||null,price:$("#productPrice").value?Number($("#productPrice").value):null,size_label:$("#productSize").value.trim()||null,badge:$("#productBadge").value.trim()||null,short_description:$("#productShort").value.trim()||null,description:$("#productDescription").value.trim()||null,usage_instructions:$("#productUsage").value.trim()||null,safety_information:$("#productSafety").value.trim()||null,sort_order:Number($("#productOrder").value||0),is_featured:$("#productFeatured").checked,is_active:$("#productActive").checked};let productId=id;if(!productId){const r=await db.from("amasa_products").insert(p).select("id").single();if(r.error)throw r.error;productId=r.data.id}else{const r=await db.from("amasa_products").update(p).eq("id",productId);if(r.error)throw r.error}const file=$("#productImage").files[0];if(file){const imageUrl=await uploadProductImage(file,productId);const r=await db.from("amasa_products").update({image_url:imageUrl}).eq("id",productId);if(r.error)throw r.error}closeModal();toast(id?"Produk berhasil diperbarui.":"Produk berhasil ditambahkan.");await loadProducts()}catch(err){toast(err?.message||"Gagal menyimpan produk.")}finally{saveBtn.disabled=false;saveBtn.textContent="Simpan Produk"}};
 async function removeProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p||!confirm('Hapus produk "'+p.name+'"?'))return;const {error}=await db.from("amasa_products").delete().eq("id",id);if(error)return toast(error.message);toast("Produk berhasil dihapus.");loadProducts()}
-$("#productSearch").oninput=renderProducts;$("#productCategoryFilter").onchange=renderProducts;$("#logoutButton").onclick=async()=>{await db.auth.signOut();location.href="login.html"};$("#saveSettings").onclick=()=>toast("Pengaturan belum dibuat di Supabase.");
+$("#productSearch").oninput=renderProducts;$("#productCategoryFilter").onchange=renderProducts;
+async function loadSettings(){
+  const {data,error}=await db.from("amasa_site_content").select("id,content").eq("section_slug","settings").maybeSingle();
+  if(error)return toast(error.message);
+  if(!data)return;
+  let v={};
+  try{v=JSON.parse(data.content||"{}")}catch(e){}
+  $("#settingBrand").value=v.brand_name||"AMASA";
+  $("#settingCompany").value=v.company_name||"PT Adiimasa Distribusi Indonesia";
+  $("#settingWhatsapp").value=v.whatsapp||"";
+  $("#settingEmail").value=v.email||"";
+  $("#settingAddress").value=v.address||"";
+  $("#settingInstagram").value=v.instagram_url||"";
+  $("#settingFacebook").value=v.facebook_url||"";
+  $("#settingTiktok").value=v.tiktok_url||"";
+  $("#settingWebsite").value=v.website_url||"";
+}
+$("#saveSettings").onclick=async()=>{
+  const btn=$("#saveSettings");btn.disabled=true;btn.textContent="Menyimpan...";
+  try{
+    const payload={
+      brand_name:$("#settingBrand").value.trim(),
+      company_name:$("#settingCompany").value.trim(),
+      whatsapp:$("#settingWhatsapp").value.trim(),
+      email:$("#settingEmail").value.trim(),
+      address:$("#settingAddress").value.trim(),
+      instagram_url:$("#settingInstagram").value.trim(),
+      facebook_url:$("#settingFacebook").value.trim(),
+      tiktok_url:$("#settingTiktok").value.trim(),
+      website_url:$("#settingWebsite").value.trim()
+    };
+    const {data,error}=await db.from("amasa_site_content").select("id").eq("section_slug","settings").maybeSingle();
+    if(error)throw error;
+    if(!data)throw new Error("Data pengaturan belum tersedia.");
+    const r=await db.from("amasa_site_content").update({content:JSON.stringify(payload),title:payload.brand_name,updated_at:new Date().toISOString()}).eq("id",data.id);
+    if(r.error)throw r.error;
+    toast("Pengaturan berhasil disimpan.");
+  }catch(err){toast(err?.message||"Gagal menyimpan pengaturan.")}finally{btn.disabled=false;btn.textContent="Simpan Pengaturan"}
+};
+$("#logoutButton").onclick=async()=>{await db.auth.signOut();location.href="login.html"};
 async function loadWebsiteContent(){
   const {data,error}=await db.from("amasa_site_content").select("id,section_slug,section_name,title,subtitle,content,image_url,button_text,button_url,sort_order,is_active").order("sort_order",{ascending:true});
   if(error)return toast(error.message);
@@ -155,5 +194,5 @@ $("#contentForm").onsubmit=async e=>{
   }catch(err){toast(err?.message||"Gagal menyimpan konten.")}finally{saveBtn.disabled=false;saveBtn.textContent="Simpan Konten"}
 };
 
-(async()=>{if(await requireAdmin()){try{await check();await loadCategories();await loadProducts();await loadWebsiteContent()}catch(e){console.error(e)}}})();
+(async()=>{if(await requireAdmin()){try{await check();await loadCategories();await loadProducts();await loadWebsiteContent();await loadSettings()}catch(e){console.error(e)}}})();
 // mobile sidebar navigation fix
