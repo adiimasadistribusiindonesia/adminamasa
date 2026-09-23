@@ -228,11 +228,12 @@ $("#saveSettings").onclick=async()=>{
 };
 $("#logoutButton").onclick=async()=>{await db.auth.signOut();location.href="login.html"};
 async function loadWebsiteContent(){
-  const {data,error}=await db.from("amasa_site_content").select("id,section_slug,section_name,title,subtitle,content,image_url,button_text,button_url,sort_order,is_active").order("sort_order",{ascending:true});
+  const {data,error}=await db.from("amasa_site_content").select("id,section_slug,section_name,title,subtitle,content,image_url,button_text,button_url,sort_order,is_active");
   if(error)return toast(error.message);
   const grid=$("#contentGrid");
   if(!grid)return;
-  const items=(data||[]).filter(x=>x.section_slug!=="settings");
+  const fixedOrder={hero:1,about:2,gallery:3,video:4,testimoni:5,faq:6};
+  const items=(data||[]).filter(x=>x.section_slug!=="settings").sort((a,b)=>(fixedOrder[a.section_slug]??99)-(fixedOrder[b.section_slug]??99));
   grid.innerHTML=items.length?items.map(x=>'<button type="button" class="content-card" data-content-edit="'+x.id+'"><strong>'+esc(x.section_name)+'</strong><span>'+esc(x.title||"Belum diatur")+'</span><small class="muted">'+(x.is_active?"Aktif":"Nonaktif")+'</small></button>').join(""):'<div class="empty">Belum ada konten website.</div>';
   document.querySelectorAll("[data-content-edit]").forEach(b=>b.onclick=()=>openContentModal(items.find(x=>String(x.id)===String(b.dataset.contentEdit))));
 }
@@ -261,7 +262,6 @@ function openContentModal(item){
   $("#contentImagePreview").src=item.image_url||"";
   $("#contentImagePreview").hidden=!item.image_url;
   $("#contentImage").dataset.currentUrl=item.image_url||"";
-  $("#contentOrder").value=item.sort_order??0;
   $("#contentActive").checked=!!item.is_active;
 }
 function closeContentModal(){$("#contentModal").hidden=true}
@@ -280,7 +280,7 @@ $("#contentForm").onsubmit=async e=>{
       image_url:$("#contentImage").dataset.currentUrl||null,
       button_text:null,
       button_url:null,
-      sort_order:Number($("#contentOrder").value||0),
+      sort_order:item.sort_order,
       is_active:$("#contentActive").checked,
       updated_at:new Date().toISOString()
     };
