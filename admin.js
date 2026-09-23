@@ -245,6 +245,7 @@ function openContentModal(item){
   $("#contentSectionName").value=item.section_name||"";
   $("#contentTitle").value=item.title||"";
   $("#contentSubtitle").value=item.subtitle||"";
+  $("#contentBody").value=item.content||"";
   $("#aboutParagraph1").value="";
   $("#aboutParagraph2").value="";
   if(item.section_slug==="about"){
@@ -268,6 +269,7 @@ function closeContentModal(){$("#contentModal").hidden=true}
 document.querySelectorAll("[data-content-close]").forEach(b=>b.onclick=closeContentModal);
 $("#contentImage").onchange=()=>{const f=$("#contentImage").files[0];if(!f)return;if(!f.type.startsWith("image/")){toast("File harus berupa gambar.");$("#contentImage").value="";return}if(f.size>5*1024*1024){toast("Ukuran gambar maksimal 5 MB.");$("#contentImage").value="";return}$("#contentImagePreview").src=URL.createObjectURL(f);$("#contentImagePreview").hidden=false;$("#contentImageInfo").textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
 async function uploadContentImage(file,sectionSlug){const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";const path="content/"+sectionSlug+"/"+crypto.randomUUID()+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"image/jpeg"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
+function itemSectionSlug(id){const card=document.querySelector('[data-content-edit="'+id+'"]');return card?.dataset.sectionSlug||"";}
 $("#contentForm").onsubmit=async e=>{
   e.preventDefault();
   const id=$("#contentId").value,saveBtn=$("#saveContent");
@@ -276,7 +278,7 @@ $("#contentForm").onsubmit=async e=>{
     const p={
       title:$("#contentTitle").value.trim()||null,
       subtitle:$("#contentSubtitle").value.trim()||null,
-      content:null,
+      content:$("#contentBody").value.trim()||null,
       image_url:$("#contentImage").dataset.currentUrl||null,
       button_text:null,
       button_url:null,
