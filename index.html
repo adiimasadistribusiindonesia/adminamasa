@@ -34,7 +34,6 @@
           <div class="eyebrow">PT ADIIMASA DISTRIBUSI INDONESIA</div>
           <h1 id="pageTitle">Dashboard</h1>
         </div>
-        <div class="api-status" id="apiStatus">Supabase belum dicek</div>
       </header>
 
       <section class="page active" id="page-dashboard">
@@ -54,12 +53,23 @@
           <div class="stat-card"><span>Status Sistem</span><strong id="statSystem">—</strong></div>
         </div>
 
-        <div class="panel">
+        <div class="panel analytics-panel">
           <div class="panel-head">
-            <div><h3>Alur Sistem</h3><p>Website AMASA terhubung langsung ke Supabase.</p></div>
+            <div>
+              <span class="eyebrow">WEBSITE ANALYTICS</span>
+              <h3>Pengunjung Website</h3>
+              <p>Ringkasan pengunjung dan pageview AMASA dalam 7 hari terakhir.</p>
+            </div>
+            <span class="analytics-period">7 Hari</span>
           </div>
-          <div class="system-flow">
-            <div>Website</div><span>→</span><div>Admin AMASA</div><span>→</span><div>Supabase</div><span>→</span><div>Database</div>
+          <div class="analytics-summary">
+            <div><span>Pengunjung Unik</span><strong id="analyticsVisitors">0</strong></div>
+            <div><span>Pageview</span><strong id="analyticsPageviews">0</strong></div>
+            <div><span>Sesi</span><strong id="analyticsSessions">0</strong></div>
+          </div>
+          <div class="visitor-chart-wrap">
+            <svg id="visitorChart" class="visitor-chart" viewBox="0 0 900 280" role="img" aria-label="Grafik pengunjung website"></svg>
+            <div id="visitorEmpty" class="analytics-empty" hidden>Belum ada data pengunjung AMASA.</div>
           </div>
         </div>
       </section>
