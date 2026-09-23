@@ -237,7 +237,7 @@ async function loadWebsiteContent(){
   document.querySelectorAll("[data-content-edit]").forEach(b=>b.onclick=()=>openContentModal(items.find(x=>String(x.id)===String(b.dataset.contentEdit))));
 }
 function openContentModal(item){
-  if(!item)return;
+  if(!item || item.section_slug==="settings") return;
   $("#contentModal").hidden=false;
   $("#contentModalTitle").textContent="Edit "+item.section_name;
   $("#contentId").value=item.id;
