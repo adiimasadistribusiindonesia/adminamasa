@@ -1,3 +1,4 @@
+*[hidden]{display:none !important}
 *{box-sizing:border-box}
 :root{--navy:#102437;--navy2:#0b1928;--gold:#b58a50;--bg:#f4f6f8;--white:#fff;--text:#172433;--muted:#6b7785;--line:#e2e7eb;--danger:#b83b3b}
 body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,"Segoe UI",Arial,sans-serif}
