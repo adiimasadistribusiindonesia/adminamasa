@@ -117,11 +117,6 @@ async function loadSettings(){
   $("#settingCompany").value=v.company_name||"PT Adiimasa Distribusi Indonesia";
   $("#settingWhatsapp").value=v.whatsapp||"";
   $("#settingEmail").value=v.email||"";
-  $("#settingAddress").value=v.address||"";
-  $("#settingInstagram").value=v.instagram_url||"";
-  $("#settingFacebook").value=v.facebook_url||"";
-  $("#settingTiktok").value=v.tiktok_url||"";
-  $("#settingWebsite").value=v.website_url||"";
 }
 $("#saveSettings").onclick=async()=>{
   const btn=$("#saveSettings");btn.disabled=true;btn.textContent="Menyimpan...";
@@ -131,11 +126,6 @@ $("#saveSettings").onclick=async()=>{
       company_name:$("#settingCompany").value.trim(),
       whatsapp:$("#settingWhatsapp").value.trim(),
       email:$("#settingEmail").value.trim(),
-      address:$("#settingAddress").value.trim(),
-      instagram_url:$("#settingInstagram").value.trim(),
-      facebook_url:$("#settingFacebook").value.trim(),
-      tiktok_url:$("#settingTiktok").value.trim(),
-      website_url:$("#settingWebsite").value.trim()
     };
     const {data,error}=await db.from("amasa_site_content").select("id").eq("section_slug","settings").maybeSingle();
     if(error)throw error;
