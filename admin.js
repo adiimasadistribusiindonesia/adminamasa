@@ -41,3 +41,4 @@ $("#productForm").onsubmit=async e=>{e.preventDefault();const id=$("#productId")
 async function removeProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p||!confirm('Hapus produk "'+p.name+'"?'))return;const {error}=await db.from("amasa_products").delete().eq("id",id);if(error)return toast(error.message);toast("Produk berhasil dihapus.");loadProducts()}
 $("#productSearch").oninput=renderProducts;$("#productCategoryFilter").onchange=renderProducts;$("#logoutButton").onclick=async()=>{await db.auth.signOut();location.href="login.html"};$("#saveSettings").onclick=()=>toast("Pengaturan belum dibuat di Supabase.");
 (async()=>{if(await requireAdmin()){try{await check();await loadCategories();await loadProducts()}catch(e){console.error(e)}}})();
+// mobile sidebar navigation fix
