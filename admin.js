@@ -234,7 +234,9 @@ async function loadWebsiteContent(){
   if(!grid)return;
   const fixedOrder={hero:1,about:2,gallery:3,video:4,testimoni:5,faq:6};
   const items=(data||[]).filter(x=>x.section_slug!=="settings").sort((a,b)=>(fixedOrder[a.section_slug]??99)-(fixedOrder[b.section_slug]??99));
-  grid.innerHTML=items.length?items.map(x=>'<button type="button" class="content-card" data-content-edit="'+x.id+'" data-gallery="'+(x.section_slug==="gallery"?esc(x.content||""):"")+'"><strong>'+esc(x.section_name)+'</strong><span>'+esc(x.title||"Belum diatur")+'</span><small class="muted">'+(x.is_active?"Aktif":"Nonaktif")+'</small></button>').join(""):'<div class="empty">Belum ada konten website.</div>';
+  grid.innerHTML=items.length?items.map(x=>x.section_slug==="faq"
+    ? '<div class="content-card content-card-locked"><strong>'+esc(x.section_name)+'</strong><span>'+esc(x.title||"Pertanyaan yang Sering Diajukan")+'</span><small class="muted">Dikunci • FAQ dikelola AMASA</small></div>'
+    : '<button type="button" class="content-card" data-content-edit="'+x.id+'" data-gallery="'+(x.section_slug==="gallery"?esc(x.content||""):"")+'"><strong>'+esc(x.section_name)+'</strong><span>'+esc(x.title||"Belum diatur")+'</span><small class="muted">'+(x.is_active?"Aktif":"Nonaktif")+'</small></button>').join(""):'<div class="empty">Belum ada konten website.</div>';
   document.querySelectorAll("[data-content-edit]").forEach(b=>b.onclick=()=>openContentModal(items.find(x=>String(x.id)===String(b.dataset.contentEdit))));
 }
 function renderGalleryAdmin(items=[]){
