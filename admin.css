@@ -91,15 +91,21 @@ button{cursor:pointer}
 .gallery-admin-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px;margin-bottom:12px}.gallery-admin-item{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:8px}.gallery-admin-item>span{font-weight:700}.gallery-admin-item .gallery-info{min-height:16px}.gallery-admin-item .product-image-preview{max-width:160px;max-height:120px;object-fit:cover;border-radius:8px}.gallery-admin-item .gallery-remove{align-self:flex-start}@media(max-width:600px){.gallery-admin-list{grid-template-columns:1fr}}
 
 
-/* Admin footer */
-.admin-footer{
+
+
+.sidebar-bottom{
   margin-top:auto;
-  padding:22px 32px;
-  border-top:1px solid var(--line);
-  color:var(--muted);
-  font-size:12px;
+  padding-top:16px;
+}
+.sidebar-copyright{
+  margin-top:14px;
+  padding-top:14px;
+  border-top:1px solid rgba(255,255,255,.12);
+  color:rgba(255,255,255,.55);
+  font-size:10px;
+  line-height:1.5;
   text-align:center;
 }
 @media(max-width:900px){
-  .admin-footer{padding:18px 14px;font-size:11px}
+  .sidebar-copyright{font-size:9px;padding:12px 10px 0}
 }
