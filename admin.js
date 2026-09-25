@@ -289,6 +289,39 @@ function getVideoAdminItems(){
   })).filter(x=>x.url||x.file?.files?.[0]);
 }
 
+function renderTestimonialAdmin(items=[]){
+  const list=$("#testimonialAdminList");if(!list)return;
+  list.innerHTML="";
+  (Array.isArray(items)?items:[]).forEach((item,index)=>{
+    const wrap=document.createElement("div");
+    wrap.className="gallery-admin-item testimonial-admin-item";
+    wrap.innerHTML='<span>Testimoni '+(index+1)+'</span>'+
+      '<input class="testimonial-name" type="text" placeholder="Nama pelanggan" value="'+esc(item?.name||"")+'">'+
+      '<input class="testimonial-role" type="text" placeholder="Keterangan / kota / pengguna AMASA" value="'+esc(item?.role||"")+'">'+
+      '<input class="testimonial-rating" type="number" min="1" max="5" step="1" placeholder="Rating 1-5" value="'+(Number(item?.rating)||5)+'">'+
+      '<textarea class="testimonial-text" rows="4" placeholder="Pengalaman pelanggan">'+esc(item?.text||"")+'</textarea>'+
+      '<button type="button" class="small-btn delete testimonial-remove">Hapus Testimoni</button>';
+    list.appendChild(wrap);
+    wrap.querySelector(".testimonial-remove").onclick=()=>{
+      wrap.remove();
+      [...document.querySelectorAll("#testimonialAdminList .testimonial-admin-item")].forEach((el,n)=>el.querySelector("span").textContent="Testimoni "+(n+1));
+    };
+  });
+}
+function addTestimonialAdminSlot(){
+  const items=getTestimonialAdminItems();
+  items.push({name:"",role:"",rating:5,text:""});
+  renderTestimonialAdmin(items);
+}
+function getTestimonialAdminItems(){
+  return [...document.querySelectorAll("#testimonialAdminList .testimonial-admin-item")].map(w=>({
+    name:w.querySelector(".testimonial-name")?.value.trim()||"",
+    role:w.querySelector(".testimonial-role")?.value.trim()||"",
+    rating:Math.min(5,Math.max(1,Number(w.querySelector(".testimonial-rating")?.value||5))),
+    text:w.querySelector(".testimonial-text")?.value.trim()||""
+  })).filter(x=>x.name||x.role||x.text);
+}
+
 function openContentModal(item){
   if(!item||item.section_slug==="settings")return;
   $("#contentModal").hidden=false;$("#contentModalTitle").textContent="Edit "+item.section_name;$("#contentId").value=item.id;$("#contentSectionName").value=item.section_name||"";$("#contentTitle").value=item.title||"";$("#contentSubtitle").value=item.subtitle||"";$("#contentBody").value=item.content||"";
@@ -296,14 +329,16 @@ function openContentModal(item){
   if(item.section_slug==="about"){try{const about=JSON.parse(item.content||"{}");$("#aboutParagraph1").value=about.paragraph1||"";$("#aboutParagraph2").value=about.paragraph2||""}catch(e){}}
   $("#contentBodyWrap").hidden=item.section_slug==="about";$("#aboutParagraph1Wrap").hidden=item.section_slug!=="about";$("#aboutParagraph2Wrap").hidden=item.section_slug!=="about";
   $("#contentImage").value="";$("#contentImage").dataset.currentUrl=item.image_url||"";$("#contentImageInfo").textContent=item.image_url?"Gambar saat ini tersimpan. Pilih file baru untuk menggantinya.":"JPG, PNG, WEBP. Maksimal 5 MB.";$("#contentImagePreview").src=item.image_url||"";$("#contentImagePreview").hidden=!item.image_url;$("#contentActive").checked=!!item.is_active;
-  const isGallery=item.section_slug==="gallery",isVideo=item.section_slug==="video";
-  $("#contentBodyWrap").hidden=isGallery||isVideo||item.section_slug==="about";$("#galleryImagesWrap").hidden=!isGallery;$("#videoItemsWrap").hidden=!isVideo;$("#contentImageWrap").hidden=isGallery||isVideo;
+  const isGallery=item.section_slug==="gallery",isVideo=item.section_slug==="video",isTestimonial=item.section_slug==="testimoni";
+  $("#contentBodyWrap").hidden=isGallery||isVideo||isTestimonial||item.section_slug==="about";$("#galleryImagesWrap").hidden=!isGallery;$("#videoItemsWrap").hidden=!isVideo;$("#testimonialItemsWrap").hidden=!isTestimonial;$("#contentImageWrap").hidden=isGallery||isVideo||isTestimonial;
   if(isGallery){let g={};try{g=JSON.parse(item.content||"{}")}catch(e){}let items=Array.isArray(g.items)?g.items:[];if(!items.length&&item.image_url)items=[{image_url:item.image_url,label:"PRODUCT GALLERY 01"}];renderGalleryAdmin(items)}else $("#galleryAdminList").innerHTML="";
   if(isVideo){let v={};try{v=JSON.parse(item.content||"{}")}catch(e){}renderVideoAdmin(Array.isArray(v.items)?v.items:[])}else $("#videoAdminList").innerHTML="";
+  if(isTestimonial){let t={};try{t=JSON.parse(item.content||"{}")}catch(e){}renderTestimonialAdmin(Array.isArray(t.items)?t.items:[])}else $("#testimonialAdminList").innerHTML="";
 }
 
 $("#addGalleryImage").onclick=addGalleryAdminSlot;
 $("#addVideoItem").onclick=addVideoAdminSlot;
+$("#addTestimonialItem").onclick=addTestimonialAdminSlot;
 function closeContentModal(){$("#contentModal").hidden=true}
 document.querySelectorAll("[data-content-close]").forEach(b=>b.onclick=closeContentModal);
 $("#contentImage").onchange=()=>{const f=$("#contentImage").files[0];if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");$("#contentImage").value="";return}$("#contentImagePreview").src=URL.createObjectURL(f);$("#contentImagePreview").hidden=false;$("#contentImageInfo").textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
@@ -322,6 +357,9 @@ $("#contentForm").onsubmit=async e=>{
   }else if(sectionName==="Video"){
    const entries=getVideoAdminItems(),items=[];
    for(let n=0;n<entries.length;n++){let url=entries[n].url||entries[n].file?.dataset.currentUrl||"";if(entries[n].file?.files?.[0]){try{url=await uploadContentVideo(entries[n].file.files[0])}catch(err){throw new Error("Gagal upload Video "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({title:entries[n].title||"Video AMASA",url})}
+   p.content=JSON.stringify({items});p.image_url=null;
+  }else if(sectionName==="Testimoni"){
+   const items=getTestimonialAdminItems();
    p.content=JSON.stringify({items});p.image_url=null;
   }else if(sectionName==="Tentang AMASA"){
    p.content=JSON.stringify({paragraph1:$("#aboutParagraph1").value.trim(),paragraph2:$("#aboutParagraph2").value.trim()});
