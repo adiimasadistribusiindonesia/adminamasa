@@ -15,7 +15,7 @@ async function performManualLogin(){
     email:document.getElementById("email").value.trim(),
     password:document.getElementById("password").value
   });
-  if(error){msg.textContent=error.message;return}
+  if(error){msg.textContent="Gmail dan password salah, silakan coba lagi.";return}
   if(!(await checkAdmin())){
     await db.auth.signOut();
     msg.textContent="Akses ditolak. Akun ini belum diberi role admin AMASA.";
