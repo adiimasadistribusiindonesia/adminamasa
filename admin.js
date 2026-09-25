@@ -251,6 +251,44 @@ function renderGalleryAdmin(items=[]){
 }
 function addGalleryAdminSlot(){const list=$("#galleryAdminList");if(!list)return;const items=getGalleryAdminItems().map(x=>({image_url:x.url}));items.push({image_url:""});renderGalleryAdmin(items)}
 function getGalleryAdminItems(){return [...document.querySelectorAll("#galleryAdminList .gallery-admin-item")].map(w=>({input:w.querySelector(".gallery-file"),url:w.querySelector(".gallery-file")?.dataset.currentUrl||""}))}
+function renderVideoAdmin(items=[]){
+  const list=$("#videoAdminList");if(!list)return;
+  list.innerHTML="";
+  (Array.isArray(items)?items:[]).forEach((item,index)=>{
+    const wrap=document.createElement("div");
+    wrap.className="gallery-admin-item video-admin-item";
+    wrap.innerHTML='<span>Video '+(index+1)+'</span>'+
+      '<input class="video-title" type="text" placeholder="Judul video" value="'+esc(item?.title||"")+'">'+
+      '<input class="video-url" type="url" placeholder="https://youtube.com/... atau https://.../video.mp4" value="'+esc(item?.url||"")+'">'+
+      '<input class="video-file" type="file" accept="video/*">'+
+      '<small class="video-info muted">'+(item?.url?"Video tersimpan. Link/file baru akan menggantikannya.":"Belum ada video")+'</small>'+
+      '<button type="button" class="small-btn delete video-remove">Hapus Video</button>';
+    list.appendChild(wrap);
+    const file=wrap.querySelector(".video-file");
+    file.dataset.currentUrl=item?.url||"";
+    file.onchange=()=>{
+      const f=file.files[0];if(!f)return;
+      if(!f.type.startsWith("video/")||f.size>100*1024*1024){toast("File video harus berupa video dan maksimal 100 MB.");file.value="";return}
+      wrap.querySelector(".video-url").value="";
+      wrap.querySelector(".video-info").textContent=f.name+" • "+Math.round(f.size/1024/1024)+" MB";
+    };
+    wrap.querySelector(".video-remove").onclick=()=>{
+      wrap.remove();
+      [...document.querySelectorAll("#videoAdminList .video-admin-item")].forEach((el,n)=>el.querySelector("span").textContent="Video "+(n+1));
+    };
+  });
+}
+function addVideoAdminSlot(){
+  renderVideoAdmin([...getVideoAdminItems(),{title:"",url:""}]);
+}
+function getVideoAdminItems(){
+  return [...document.querySelectorAll("#videoAdminList .video-admin-item")].map(w=>({
+    title:w.querySelector(".video-title")?.value.trim()||"Video AMASA",
+    url:w.querySelector(".video-url")?.value.trim()||"",
+    file:w.querySelector(".video-file")||null
+  })).filter(x=>x.url||x.file?.files?.[0]);
+}
+
 function openContentModal(item){
   if(!item||item.section_slug==="settings")return;
   $("#contentModal").hidden=false;$("#contentModalTitle").textContent="Edit "+item.section_name;$("#contentId").value=item.id;$("#contentSectionName").value=item.section_name||"";$("#contentTitle").value=item.title||"";$("#contentSubtitle").value=item.subtitle||"";$("#contentBody").value=item.content||"";
@@ -258,15 +296,20 @@ function openContentModal(item){
   if(item.section_slug==="about"){try{const about=JSON.parse(item.content||"{}");$("#aboutParagraph1").value=about.paragraph1||"";$("#aboutParagraph2").value=about.paragraph2||""}catch(e){}}
   $("#contentBodyWrap").hidden=item.section_slug==="about";$("#aboutParagraph1Wrap").hidden=item.section_slug!=="about";$("#aboutParagraph2Wrap").hidden=item.section_slug!=="about";
   $("#contentImage").value="";$("#contentImage").dataset.currentUrl=item.image_url||"";$("#contentImageInfo").textContent=item.image_url?"Gambar saat ini tersimpan. Pilih file baru untuk menggantinya.":"JPG, PNG, WEBP. Maksimal 5 MB.";$("#contentImagePreview").src=item.image_url||"";$("#contentImagePreview").hidden=!item.image_url;$("#contentActive").checked=!!item.is_active;
-  const isGallery=item.section_slug==="gallery";$("#contentBodyWrap").hidden=isGallery||item.section_slug==="about";$("#galleryImagesWrap").hidden=!isGallery;$("#contentImageWrap").hidden=isGallery;
+  const isGallery=item.section_slug==="gallery",isVideo=item.section_slug==="video";
+  $("#contentBodyWrap").hidden=isGallery||isVideo||item.section_slug==="about";$("#galleryImagesWrap").hidden=!isGallery;$("#videoItemsWrap").hidden=!isVideo;$("#contentImageWrap").hidden=isGallery||isVideo;
   if(isGallery){let g={};try{g=JSON.parse(item.content||"{}")}catch(e){}let items=Array.isArray(g.items)?g.items:[];if(!items.length&&item.image_url)items=[{image_url:item.image_url,label:"PRODUCT GALLERY 01"}];renderGalleryAdmin(items)}else $("#galleryAdminList").innerHTML="";
+  if(isVideo){let v={};try{v=JSON.parse(item.content||"{}")}catch(e){}renderVideoAdmin(Array.isArray(v.items)?v.items:[])}else $("#videoAdminList").innerHTML="";
 }
+
 $("#addGalleryImage").onclick=addGalleryAdminSlot;
+$("#addVideoItem").onclick=addVideoAdminSlot;
 function closeContentModal(){$("#contentModal").hidden=true}
 document.querySelectorAll("[data-content-close]").forEach(b=>b.onclick=closeContentModal);
 $("#contentImage").onchange=()=>{const f=$("#contentImage").files[0];if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");$("#contentImage").value="";return}$("#contentImagePreview").src=URL.createObjectURL(f);$("#contentImagePreview").hidden=false;$("#contentImageInfo").textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
 document.querySelectorAll(".gallery-file").forEach(input=>input.onchange=()=>{const f=input.files[0],n=input.dataset.slot;if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");input.value="";return}const img=document.querySelector(`.gallery-preview[data-preview="${n}"]`),info=document.querySelector(`.gallery-info[data-info="${n}"]`);if(img){img.src=URL.createObjectURL(f);img.hidden=false}if(info)info.textContent=f.name+" • "+Math.round(f.size/1024)+" KB"});
 async function uploadContentImage(file,sectionSlug){const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";const id=(crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));const path="content/"+sectionSlug+"/"+id+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"image/jpeg",cacheControl:"31536000"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
+async function uploadContentVideo(file){const ext=(file.name.split(".").pop()||"mp4").toLowerCase().replace(/[^a-z0-9]/g,"")||"mp4";const id=(crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));const path="content/video/"+id+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"video/mp4",cacheControl:"31536000"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
 function itemSectionSlug(id){const card=document.querySelector('[data-content-edit="'+id+'"]');return card?.dataset.sectionSlug||"";}
 $("#contentForm").onsubmit=async e=>{
  e.preventDefault();const id=$("#contentId").value,saveBtn=$("#saveContent");saveBtn.disabled=true;saveBtn.textContent="Menyimpan...";
@@ -275,6 +318,10 @@ $("#contentForm").onsubmit=async e=>{
   if(sectionName==="Galeri"){
    const entries=getGalleryAdminItems(),items=[];
    for(let n=0;n<entries.length;n++){let url=entries[n].url||"";if(entries[n].input?.files?.[0]){try{url=await uploadContentImage(entries[n].input.files[0],"gallery")}catch(err){throw new Error("Gagal upload Foto "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({image_url:url,label:"PRODUCT GALLERY "+String(items.length+1).padStart(2,"0")})}
+   p.content=JSON.stringify({items});p.image_url=null;
+  }else if(sectionName==="Video"){
+   const entries=getVideoAdminItems(),items=[];
+   for(let n=0;n<entries.length;n++){let url=entries[n].url||entries[n].file?.dataset.currentUrl||"";if(entries[n].file?.files?.[0]){try{url=await uploadContentVideo(entries[n].file.files[0])}catch(err){throw new Error("Gagal upload Video "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({title:entries[n].title||"Video AMASA",url})}
    p.content=JSON.stringify({items});p.image_url=null;
   }else if(sectionName==="Tentang AMASA"){
    p.content=JSON.stringify({paragraph1:$("#aboutParagraph1").value.trim(),paragraph2:$("#aboutParagraph2").value.trim()});
