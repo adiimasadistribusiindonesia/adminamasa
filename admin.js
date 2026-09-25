@@ -322,6 +322,35 @@ function getTestimonialAdminItems(){
   })).filter(x=>x.name||x.role||x.text);
 }
 
+function renderFaqAdmin(items=[]){
+  const list=$("#faqAdminList");if(!list)return;
+  list.innerHTML="";
+  (Array.isArray(items)?items:[]).forEach((item,index)=>{
+    const wrap=document.createElement("div");
+    wrap.className="gallery-admin-item faq-admin-item";
+    wrap.innerHTML='<span>FAQ '+(index+1)+'</span>'+
+      '<input class="faq-question" type="text" placeholder="Pertanyaan" value="'+esc(item?.question||"")+'">'+
+      '<textarea class="faq-answer" rows="4" placeholder="Jawaban">'+esc(item?.answer||"")+'</textarea>'+
+      '<button type="button" class="small-btn delete faq-remove">Hapus FAQ</button>';
+    list.appendChild(wrap);
+    wrap.querySelector(".faq-remove").onclick=()=>{
+      wrap.remove();
+      [...document.querySelectorAll("#faqAdminList .faq-admin-item")].forEach((el,n)=>el.querySelector("span").textContent="FAQ "+(n+1));
+    };
+  });
+}
+function addFaqAdminSlot(){
+  const items=getFaqAdminItems();
+  items.push({question:"",answer:""});
+  renderFaqAdmin(items);
+}
+function getFaqAdminItems(){
+  return [...document.querySelectorAll("#faqAdminList .faq-admin-item")].map(w=>({
+    question:w.querySelector(".faq-question")?.value.trim()||"",
+    answer:w.querySelector(".faq-answer")?.value.trim()||""
+  })).filter(x=>x.question||x.answer);
+}
+
 function openContentModal(item){
   if(!item||item.section_slug==="settings")return;
   $("#contentModal").hidden=false;$("#contentModalTitle").textContent="Edit "+item.section_name;$("#contentId").value=item.id;$("#contentSectionName").value=item.section_name||"";$("#contentTitle").value=item.title||"";$("#contentSubtitle").value=item.subtitle||"";$("#contentBody").value=item.content||"";
@@ -329,16 +358,18 @@ function openContentModal(item){
   if(item.section_slug==="about"){try{const about=JSON.parse(item.content||"{}");$("#aboutParagraph1").value=about.paragraph1||"";$("#aboutParagraph2").value=about.paragraph2||""}catch(e){}}
   $("#contentBodyWrap").hidden=item.section_slug==="about";$("#aboutParagraph1Wrap").hidden=item.section_slug!=="about";$("#aboutParagraph2Wrap").hidden=item.section_slug!=="about";
   $("#contentImage").value="";$("#contentImage").dataset.currentUrl=item.image_url||"";$("#contentImageInfo").textContent=item.image_url?"Gambar saat ini tersimpan. Pilih file baru untuk menggantinya.":"JPG, PNG, WEBP. Maksimal 5 MB.";$("#contentImagePreview").src=item.image_url||"";$("#contentImagePreview").hidden=!item.image_url;$("#contentActive").checked=!!item.is_active;
-  const isGallery=item.section_slug==="gallery",isVideo=item.section_slug==="video",isTestimonial=item.section_slug==="testimoni";
-  $("#contentBodyWrap").hidden=isGallery||isVideo||isTestimonial||item.section_slug==="about";$("#galleryImagesWrap").hidden=!isGallery;$("#videoItemsWrap").hidden=!isVideo;$("#testimonialItemsWrap").hidden=!isTestimonial;$("#contentImageWrap").hidden=isGallery||isVideo||isTestimonial;
+  const isGallery=item.section_slug==="gallery",isVideo=item.section_slug==="video",isTestimonial=item.section_slug==="testimoni",isFaq=item.section_slug==="faq";
+  $("#contentBodyWrap").hidden=isGallery||isVideo||isTestimonial||isFaq||item.section_slug==="about";$("#galleryImagesWrap").hidden=!isGallery;$("#videoItemsWrap").hidden=!isVideo;$("#testimonialItemsWrap").hidden=!isTestimonial;$("#faqItemsWrap").hidden=!isFaq;$("#contentImageWrap").hidden=isGallery||isVideo||isTestimonial||isFaq;
   if(isGallery){let g={};try{g=JSON.parse(item.content||"{}")}catch(e){}let items=Array.isArray(g.items)?g.items:[];if(!items.length&&item.image_url)items=[{image_url:item.image_url,label:"PRODUCT GALLERY 01"}];renderGalleryAdmin(items)}else $("#galleryAdminList").innerHTML="";
   if(isVideo){let v={};try{v=JSON.parse(item.content||"{}")}catch(e){}renderVideoAdmin(Array.isArray(v.items)?v.items:[])}else $("#videoAdminList").innerHTML="";
   if(isTestimonial){let t={};try{t=JSON.parse(item.content||"{}")}catch(e){}renderTestimonialAdmin(Array.isArray(t.items)?t.items:[])}else $("#testimonialAdminList").innerHTML="";
+  if(isFaq){let f={};try{f=JSON.parse(item.content||"{}")}catch(e){}renderFaqAdmin(Array.isArray(f.items)?f.items:[])}else $("#faqAdminList").innerHTML="";
 }
 
 $("#addGalleryImage").onclick=addGalleryAdminSlot;
 $("#addVideoItem").onclick=addVideoAdminSlot;
 $("#addTestimonialItem").onclick=addTestimonialAdminSlot;
+$("#addFaqItem").onclick=addFaqAdminSlot;
 function closeContentModal(){$("#contentModal").hidden=true}
 document.querySelectorAll("[data-content-close]").forEach(b=>b.onclick=closeContentModal);
 $("#contentImage").onchange=()=>{const f=$("#contentImage").files[0];if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");$("#contentImage").value="";return}$("#contentImagePreview").src=URL.createObjectURL(f);$("#contentImagePreview").hidden=false;$("#contentImageInfo").textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
@@ -357,6 +388,9 @@ $("#contentForm").onsubmit=async e=>{
   }else if(sectionName==="Video"){
    const entries=getVideoAdminItems(),items=[];
    for(let n=0;n<entries.length;n++){let url=entries[n].url||entries[n].file?.dataset.currentUrl||"";if(entries[n].file?.files?.[0]){try{url=await uploadContentVideo(entries[n].file.files[0])}catch(err){throw new Error("Gagal upload Video "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({title:entries[n].title||"Video AMASA",url})}
+   p.content=JSON.stringify({items});p.image_url=null;
+  }else if(sectionName==="FAQ"){
+   const items=getFaqAdminItems();
    p.content=JSON.stringify({items});p.image_url=null;
   }else if(sectionName==="Testimoni"){
    const items=getTestimonialAdminItems();
