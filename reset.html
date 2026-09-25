@@ -8,10 +8,10 @@
 <div class="login-logo">AMASA</div><div class="login-sub">ADMIN PANEL</div>
 <h1 id="title">Lupa Password</h1><p id="desc">Masukkan email akun Admin AMASA untuk menerima link reset password.</p>
 <form id="resetForm" class="login-form">
-<label id="emailWrap">Email<input id="email" type="email" required></label>
+<label id="emailWrap">Email<input id="email" name="email" type="email" autocomplete="username" required></label>
 <label id="passWrap" class="password-wrap hidden">Password Baru<input id="password" type="password" minlength="6"><button type="button" class="password-toggle" aria-label="Tampilkan password" onclick="togglePassword('password',this)">👁</button></label>
 <label id="confirmWrap" class="password-wrap hidden">Ulangi Password<input id="confirm" type="password" minlength="6"><button type="button" class="password-toggle" aria-label="Tampilkan password" onclick="togglePassword('confirm',this)">👁</button></label>
-<button id="submit" type="submit">Kirim Link Reset</button>
+<button id="submit" type="button">Kirim Link Reset</button>
 <button type="button" class="login-link" onclick="location.href='login.html'">Kembali ke Login</button>
 <div id="msg" class="login-msg"></div>
 </form>
@@ -58,5 +58,6 @@ function isRateLimitError(error){
 function setRecovery(){recovery=true;clearInterval(countdownTimer);localStorage.removeItem(RATE_LIMIT_KEY);document.getElementById("emailWrap").classList.add("hidden");document.getElementById("passWrap").classList.remove("hidden");document.getElementById("confirmWrap").classList.remove("hidden");document.getElementById("title").textContent="Password Baru";document.getElementById("desc").textContent="Buat password baru untuk akun Admin AMASA.";submit.textContent="Simpan Password Baru";submit.disabled=false;submit.style.opacity="";submit.style.cursor="";}
 db.auth.onAuthStateChange((event,session)=>{if(event==="PASSWORD_RECOVERY"&&session)setRecovery();});
 restoreRateLimitCountdown();
-form.onsubmit=async e=>{e.preventDefault();if(!recovery){if(submit.disabled)return;msg.textContent="Mengirim link reset...";const {error}=await db.auth.resetPasswordForEmail(document.getElementById("email").value.trim(),{redirectTo:location.origin+location.pathname});if(error){msg.textContent=error.message;if(isRateLimitError(error))startRateLimitCountdown(Date.now()+RATE_LIMIT_MS);}else{msg.className="login-msg ok";msg.textContent="Link reset sudah dikirim. Silakan cek Gmail/spam.";}}else{const p=document.getElementById("password").value,c=document.getElementById("confirm").value;if(p!==c){msg.textContent="Password tidak sama.";return}if(p.length<6){msg.textContent="Password minimal 6 karakter.";return}msg.textContent="Menyimpan...";const {error}=await db.auth.updateUser({password:p});if(error){msg.textContent=error.message;return}await db.auth.signOut();msg.className="login-msg ok";msg.textContent="Password berhasil diubah. Silakan login kembali.";setTimeout(()=>location.href="login.html",1200)}};
+async function handleResetClick(){if(!recovery){if(submit.disabled)return;msg.textContent="Mengirim link reset...";const {error}=await db.auth.resetPasswordForEmail(document.getElementById("email").value.trim(),{redirectTo:location.origin+location.pathname});if(error){msg.textContent=error.message;if(isRateLimitError(error))startRateLimitCountdown(Date.now()+RATE_LIMIT_MS);}else{msg.className="login-msg ok";msg.textContent="Link reset sudah dikirim. Silakan cek Gmail/spam.";}}else{const p=document.getElementById("password").value,c=document.getElementById("confirm").value;if(p!==c){msg.textContent="Password tidak sama.";return}if(p.length<6){msg.textContent="Password minimal 6 karakter.";return}msg.textContent="Menyimpan...";const {error}=await db.auth.updateUser({password:p});if(error){msg.textContent=error.message;return}await db.auth.signOut();msg.className="login-msg ok";msg.textContent="Password berhasil diubah. Silakan login kembali.";setTimeout(()=>location.href="login.html",1200)}}
+document.getElementById("submit").addEventListener("click",handleResetClick);
 </script></body></html>
