@@ -43,8 +43,11 @@ async function loadVisitorAnalytics(){
   const chart=$("#visitorChart"), empty=$("#visitorEmpty");
   if(!visitorsEl||!pageviewsEl||!sessionsEl||!chart)return;
 
-  const jakartaTodayText=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jakarta",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
-  const today=new Date(jakartaTodayText+"T00:00:00");
+  const jakartaParts=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Jakarta",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+  const jakartaYear=jakartaParts.find(p=>p.type==="year")?.value;
+  const jakartaMonth=jakartaParts.find(p=>p.type==="month")?.value;
+  const jakartaDay=jakartaParts.find(p=>p.type==="day")?.value;
+  const today=new Date(Number(jakartaYear),Number(jakartaMonth)-1,Number(jakartaDay));
   const start=new Date(today);
   start.setDate(today.getDate()-6);
   const startKey=formatDateKey(start);
