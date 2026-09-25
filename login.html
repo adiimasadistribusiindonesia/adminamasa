@@ -6,7 +6,7 @@
 const db=supabase.createClient("https://fysaxpqpqexjnlpkbwap.supabase.co","sb_publishable_DWRaEZTcNMjhglwN3nqCOw_pua8rsjD");
 function togglePassword(id,btn){const input=document.getElementById(id);const show=input.type==="password";input.type=show?"text":"password";btn.textContent=show?"🙈":"👁";btn.setAttribute("aria-label",show?"Sembunyikan password":"Tampilkan password")}
 async function checkAdmin(){const {data:{user},error:userError}=await db.auth.getUser();if(userError||!user)return false;const {data:admin,error}=await db.from("amasa_admins").select("user_id,role").eq("user_id",user.id).eq("role","admin").maybeSingle();return !error&&!!admin}
-(async()=>{const {data:{session}}=await db.auth.getSession();if(session){if(await checkAdmin())location.href="index.html";else await db.auth.signOut()}})();
+
 document.getElementById("loginForm").onsubmit=async e=>{e.preventDefault();const msg=document.getElementById("msg");msg.className="login-msg";msg.textContent="Memproses...";const {error}=await db.auth.signInWithPassword({email:document.getElementById("email").value.trim(),password:document.getElementById("password").value});if(error){msg.textContent=error.message;return}if(!(await checkAdmin())){await db.auth.signOut();msg.textContent="Akses ditolak. Akun ini belum diberi role admin AMASA.";return}location.href="index.html"};
 document.getElementById("forgotButton").onclick=()=>{const email=document.getElementById("email").value.trim();if(email)location.href="reset.html?email="+encodeURIComponent(email);else location.href="reset.html"};
 </script></body></html>
