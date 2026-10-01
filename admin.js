@@ -17,6 +17,13 @@ async function requireAdmin(){
     location.href="login.html";
     return false;
   }
+  const {data:client,error:clientError}=await db.from("core_platform_clients").select("id,status").eq("module_slug","PRODUCT").eq("name","AMASA").maybeSingle();
+  if(clientError||client?.status!=="ACTIVE"){
+    await db.auth.signOut();
+    alert("Akses AMASA belum disetujui Core Adiimasa.");
+    location.href="login.html";
+    return false;
+  }
   return true;
 }
 
