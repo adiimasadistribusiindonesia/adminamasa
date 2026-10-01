@@ -69,7 +69,7 @@ async function performManualLogin(){
   }
   if(!approvalResult){
     await db.auth.signOut();
-    msg.textContent="Akses AMASA belum disetujui Core Adiimasa. Silakan tunggu persetujuan.";
+    msg.textContent="Akses Anda belum disetujui Core Adiimasa. Silakan tunggu persetujuan.";
     return
   }
   location.href="index.html";
