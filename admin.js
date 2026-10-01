@@ -115,7 +115,7 @@ async function enforceAmasaAccessLive(showNotice=true){
       if(amasaAccessWatchTimer) clearInterval(amasaAccessWatchTimer);
       amasaAccessWasApproved=false;
       await db.auth.signOut();
-      showAccessDisabledPopup("Akun AMASA Anda telah dinonaktifkan oleh Core Adiimasa.",()=>location.href="login.html");
+      showAccessDisabledPopup("Akun Anda telah dinonaktifkan oleh Core Adiimasa.",()=>location.href="login.html");
       return false;
     }
 
