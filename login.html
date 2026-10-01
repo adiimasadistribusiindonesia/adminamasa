@@ -171,44 +171,11 @@ async function registerClient(){
       return;
     }
 
-    /* Buat permintaan Core segera setelah akun Auth berhasil dibuat.
-       Ini tetap berjalan walaupun email confirmation aktif dan session=null. */
-    if(data?.user){
-      const {data:existingAccess,error:lookupError}=await db.from("amasa_core_access")
-        .select("id,approval_status,is_active")
-        .eq("email",email)
-        .maybeSingle();
-      if(lookupError){
-        console.error("AMASA registration access lookup:",lookupError);
-        msg.textContent="Akun berhasil dibuat, tetapi status permintaan akses belum dapat diperiksa. Silakan coba login kembali.";
-        return;
-      }
-      if(!existingAccess){
-        const {error:accessError}=await db.from("amasa_core_access").insert({
-          user_id:data.user.id,
-          email:email,
-          owner_name:name,
-          core_name:"PT ADIIMASA DISTRIBUSI INDONESIA",
-          module_slug:"PRODUCT",
-          client_name:"AMASA",
-          role:"admin",
-          approval_status:"PENDING",
-          is_active:false
-        });
-        if(accessError){
-          console.error("AMASA registration access:",accessError);
-          msg.textContent="Akun berhasil dibuat, tetapi permintaan akses ke Core belum dapat dibuat. Silakan coba login kembali.";
-          return;
-        }
-      }
-      if(data?.session) await db.auth.signOut();
-      msg.className="login-msg ok";
-      msg.textContent=data?.session
-        ?"Pendaftaran berhasil. Permintaan akses sudah dikirim ke Core Adiimasa. Setelah disetujui, Anda dapat login dengan email dan password."
-        :"Pendaftaran berhasil. Silakan cek Gmail untuk konfirmasi akun. Permintaan akses sudah dicatat dan menunggu persetujuan Core Adiimasa.";
-      document.getElementById("registerForm").reset();
-      return;
-    }
+    msg.className="login-msg ok";
+    msg.textContent="Pendaftaran berhasil. Silakan cek Gmail untuk konfirmasi akun. Akses Core Adiimasa masih menunggu persetujuan.";
+
+    document.getElementById("registerForm").reset();
+    return;
 
     msg.className="login-msg ok";
     msg.textContent="Pendaftaran berhasil. Silakan cek Gmail untuk konfirmasi akun.";
