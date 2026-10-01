@@ -6,7 +6,33 @@
 const db=supabase.createClient("https://fysaxpqpqexjnlpkbwap.supabase.co","sb_publishable_DWRaEZTcNMjhglwN3nqCOw_pua8rsjD");
 function togglePassword(id,btn){const input=document.getElementById(id);const show=input.type==="password";input.type=show?"text":"password";btn.textContent=show?"🙈":"👁";btn.setAttribute("aria-label",show?"Sembunyikan password":"Tampilkan password")}
 async function checkAdmin(){const {data:{user},error:userError}=await db.auth.getUser();if(userError||!user)return false;const {data:admin,error}=await db.from("amasa_admins").select("user_id,role").eq("user_id",user.id).eq("role","admin").maybeSingle();return !error&&!!admin}
-async function checkCoreApproval(){const {data,error}=await db.from("core_platform_clients").select("id,status").eq("module_slug","PRODUCT").eq("name","AMASA").maybeSingle();return !error&&data?.status==="ACTIVE"}
+async function checkCoreApproval(){
+  const {data:client,error:clientError}=await db.from("core_platform_clients").select("id,status").eq("module_slug","PRODUCT").eq("name","AMASA").maybeSingle();
+  if(clientError||client?.status!=="ACTIVE") return false;
+
+  const {data:{user},error:userError}=await db.auth.getUser();
+  if(userError||!user?.email) return false;
+
+  const {data:accessRows,error:accessError}=await db.from("amasa_core_access")
+    .select("approval_status,is_active,created_at")
+    .eq("module_slug","PRODUCT")
+    .eq("client_name","AMASA")
+    .eq("email",user.email.toLowerCase())
+    .order("created_at",{ascending:false})
+    .limit(1);
+
+  if(accessError) return false;
+
+  /* Jika akun sudah tercatat di Core, status approval menjadi penentu.
+     SUSPENDED/REJECTED/PENDING tidak boleh masuk. */
+  if(accessRows && accessRows.length){
+    const access=accessRows[0];
+    return String(access.approval_status||"").toUpperCase()==="APPROVED" && access.is_active===true;
+  }
+
+  /* Backward compatibility untuk akun lama yang belum memiliki baris approval. */
+  return true;
+}
 
 async function performManualLogin(){
   const msg=document.getElementById("msg");
