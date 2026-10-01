@@ -58,7 +58,7 @@ async function performManualLogin(){
   if(error){msg.textContent="Gmail dan password salah, silakan coba lagi.";return}
   if(!(await checkAdmin())){
     await db.auth.signOut();
-    msg.textContent="Akses ditolak. Akun ini belum diberi role admin AMASA.";
+    msg.textContent="Akses ditolak. Akun ini belum diberi role admin.";
     return
   }
   const approvalResult=await checkCoreApproval();
@@ -80,6 +80,14 @@ async function handleGoogleReturn(){
   const msg=document.getElementById("msg");
   msg.className="login-msg";
   msg.textContent="Memeriksa akses...";
+
+  /* Admin yang sudah terdaftar di amasa_admins tidak perlu melewati
+     proses provisioning/approval ulang setelah login Google. */
+  if(await checkAdmin()){
+    location.href="index.html";
+    return;
+  }
+
   const approvalResult=await checkCoreApproval();
   if(approvalResult==="PENDING_REQUEST"){
     await db.auth.signOut();
@@ -91,17 +99,11 @@ async function handleGoogleReturn(){
     msg.textContent="Akses Anda belum disetujui Core Adiimasa. Silakan tunggu persetujuan.";
     return;
   }
-  /* Akun yang sudah memiliki role admin langsung boleh masuk. */
-  if(await checkAdmin()){
-    location.href="index.html";
-    return;
-  }
-
   /* Akun Google baru: setelah Core menyetujui, buat role admin secara otomatis. */
   const {data:provisioned,error:provisionError}=await db.rpc("amasa_ensure_admin_from_core");
   if(provisionError || provisioned!==true || !(await checkAdmin())){
     await db.auth.signOut();
-    msg.textContent="Akses Anda belum memiliki role admin AMASA.";
+    msg.textContent="Akses Anda belum memiliki role admin.";
     return;
   }
   location.href="index.html";
