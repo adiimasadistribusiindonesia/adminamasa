@@ -167,7 +167,11 @@ async function registerClient(){
       options:{data:{full_name:name},emailRedirectTo:window.location.origin+window.location.pathname}
     });
     if(error){
-      msg.textContent=St    /* Buat permintaan Core segera setelah akun Auth berhasil dibuat.
+      msg.textContent=String(error.message||"Pendaftaran gagal.");
+      return;
+    }
+
+    /* Buat permintaan Core segera setelah akun Auth berhasil dibuat.
        Ini tetap berjalan walaupun email confirmation aktif dan session=null. */
     if(data?.user){
       const {data:existingAccess,error:lookupError}=await db.from("amasa_core_access")
@@ -208,8 +212,6 @@ async function registerClient(){
 
     msg.className="login-msg ok";
     msg.textContent="Pendaftaran berhasil. Silakan cek Gmail untuk konfirmasi akun.";
-etujuan.";
-    document.getElementById("registerForm").reset();
   }finally{
     btn.disabled=false;
     btn.textContent="Daftar";
