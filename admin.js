@@ -82,22 +82,28 @@ async function enforceAmasaAccessLive(showNotice=true){
       return true;
     }
 
-    if(rows && rows.length){
-      const access=rows[0];
-      const approved=String(access.approval_status||"").toUpperCase()==="APPROVED" && access.is_active===true;
-
-      if(!approved){
-        if(amasaAccessWatchTimer) clearInterval(amasaAccessWatchTimer);
-        amasaAccessWasApproved=false;
-        await db.auth.signOut();
-        alert("Akun AMASA Anda telah dinonaktifkan oleh Core Adiimasa.");
-        location.href="login.html";
-        return false;
-      }
-
-      amasaAccessWasApproved=true;
+    if(!rows || !rows.length){
+      if(amasaAccessWatchTimer) clearInterval(amasaAccessWatchTimer);
+      amasaAccessWasApproved=false;
+      await db.auth.signOut();
+      alert("Akun Anda sudah dihapus oleh Core Adiimasa. Silakan login kembali untuk mengajukan persetujuan akses.");
+      location.href="login.html";
+      return false;
     }
 
+    const access=rows[0];
+    const approved=String(access.approval_status||"").toUpperCase()==="APPROVED" && access.is_active===true;
+
+    if(!approved){
+      if(amasaAccessWatchTimer) clearInterval(amasaAccessWatchTimer);
+      amasaAccessWasApproved=false;
+      await db.auth.signOut();
+      alert("Akun AMASA Anda telah dinonaktifkan oleh Core Adiimasa.");
+      location.href="login.html";
+      return false;
+    }
+
+    amasaAccessWasApproved=true;
     return true;
   }finally{
     amasaAccessWatchBusy=false;
