@@ -54,6 +54,61 @@ async function requireAdmin(){
   return true;
 }
 
+let amasaAccessWatchTimer=null;
+let amasaAccessWatchBusy=false;
+let amasaAccessWasApproved=true;
+
+async function enforceAmasaAccessLive(showNotice=true){
+  if(amasaAccessWatchBusy) return true;
+  amasaAccessWatchBusy=true;
+  try{
+    const {data:{user},error:userError}=await db.auth.getUser();
+    if(userError||!user){
+      if(amasaAccessWatchTimer) clearInterval(amasaAccessWatchTimer);
+      location.href="login.html";
+      return false;
+    }
+
+    const {data:rows,error}=await db.from("amasa_core_access")
+      .select("approval_status,is_active")
+      .eq("module_slug","PRODUCT")
+      .eq("client_name","AMASA")
+      .eq("email",user.email.toLowerCase())
+      .order("created_at",{ascending:false})
+      .limit(1);
+
+    if(error){
+      console.warn("AMASA access watch:",error.message);
+      return true;
+    }
+
+    if(rows && rows.length){
+      const access=rows[0];
+      const approved=String(access.approval_status||"").toUpperCase()==="APPROVED" && access.is_active===true;
+
+      if(!approved){
+        if(amasaAccessWatchTimer) clearInterval(amasaAccessWatchTimer);
+        amasaAccessWasApproved=false;
+        await db.auth.signOut();
+        alert("Akun AMASA Anda telah dinonaktifkan oleh Core Adiimasa.");
+        location.href="login.html";
+        return false;
+      }
+
+      amasaAccessWasApproved=true;
+    }
+
+    return true;
+  }finally{
+    amasaAccessWatchBusy=false;
+  }
+}
+
+function startAmasaAccessWatch(){
+  if(amasaAccessWatchTimer) clearInterval(amasaAccessWatchTimer);
+  amasaAccessWatchTimer=setInterval(()=>enforceAmasaAccessLive(false),3000);
+}
+
 async function check(){
   const {error}=await db.from("amasa_products").select("id",{count:"exact",head:true});
   if(error){
@@ -444,5 +499,6 @@ $("#contentForm").onsubmit=async e=>{
  }catch(err){toast(err?.message||"Gagal menyimpan konten.")}finally{saveBtn.disabled=false;saveBtn.textContent="Simpan Konten"}
 };
 
-(async()=>{if(await requireAdmin()){try{await Promise.all([loadCategories(),loadProducts(),loadWebsiteContent(),loadSettings(),loadVisitorAnalytics()]);$("#statSystem").textContent="OK"}catch(e){console.error(e);$("#statSystem").textContent="OFF"}}})();
+(async()=>{if(await requireAdmin()){
+  startAmasaAccessWatch();try{await Promise.all([loadCategories(),loadProducts(),loadWebsiteContent(),loadSettings(),loadVisitorAnalytics()]);$("#statSystem").textContent="OK"}catch(e){console.error(e);$("#statSystem").textContent="OFF"}}})();
 // mobile sidebar navigation fix
