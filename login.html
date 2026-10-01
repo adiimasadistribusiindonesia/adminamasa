@@ -91,13 +91,15 @@ async function handleGoogleReturn(){
     msg.textContent="Akses Anda belum disetujui Core Adiimasa. Silakan tunggu persetujuan.";
     return;
   }
-  const {data:provisioned,error:provisionError}=await db.rpc("amasa_ensure_admin_from_core");
-  if(provisionError || provisioned!==true){
-    await db.auth.signOut();
-    msg.textContent="Akses Anda belum memiliki role admin AMASA.";
+  /* Akun yang sudah memiliki role admin langsung boleh masuk. */
+  if(await checkAdmin()){
+    location.href="index.html";
     return;
   }
-  if(!(await checkAdmin())){
+
+  /* Akun Google baru: setelah Core menyetujui, buat role admin secara otomatis. */
+  const {data:provisioned,error:provisionError}=await db.rpc("amasa_ensure_admin_from_core");
+  if(provisionError || provisioned!==true || !(await checkAdmin())){
     await db.auth.signOut();
     msg.textContent="Akses Anda belum memiliki role admin AMASA.";
     return;
