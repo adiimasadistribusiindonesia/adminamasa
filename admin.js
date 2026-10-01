@@ -4,6 +4,24 @@ const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 let products=[],categories=[];
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 function toast(m){const e=$("#toast");e.textContent=m;e.hidden=false;setTimeout(()=>e.hidden=true,2800)}
+function showAccessDisabledPopup(message,callback){
+  let modal=document.getElementById("accessDisabledPopup");
+  if(!modal){
+    modal=document.createElement("div");
+    modal.id="accessDisabledPopup";
+    modal.innerHTML='<div class="access-disabled-backdrop"><div class="access-disabled-box"><div class="access-disabled-icon">!</div><h3>Akses Dinonaktifkan</h3><p id="accessDisabledMessage"></p><button type="button" id="accessDisabledOk">Mengerti</button></div></div>';
+    const style=document.createElement("style");
+    style.textContent="#accessDisabledPopup{position:fixed;inset:0;z-index:99999}#accessDisabledPopup .access-disabled-backdrop{position:absolute;inset:0;background:rgba(5,18,30,.58);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}#accessDisabledPopup .access-disabled-box{width:min(420px,92vw);background:#fff;border-radius:16px;padding:28px 24px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.28)}#accessDisabledPopup .access-disabled-icon{width:46px;height:46px;margin:0 auto 14px;border-radius:50%;background:#fff1f1;color:#b83b3b;font-size:28px;font-weight:900;line-height:46px}#accessDisabledPopup h3{margin:0 0 10px;color:#102437;font-size:22px}#accessDisabledPopup p{margin:0;color:#6b7785;font-size:14px;line-height:1.6}#accessDisabledPopup button{margin-top:22px;border:0;border-radius:9px;padding:12px 28px;background:#b58a50;color:#fff;font-weight:800;cursor:pointer}";
+    document.head.appendChild(style);
+    document.body.appendChild(modal);
+  }
+  document.getElementById("accessDisabledMessage").textContent=message;
+  modal.hidden=false;
+  document.getElementById("accessDisabledOk").onclick=()=>{
+    modal.hidden=true;
+    if(typeof callback==="function")callback();
+  };
+}
 function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
 function rupiah(v){return new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(v)}
 
@@ -86,8 +104,7 @@ async function enforceAmasaAccessLive(showNotice=true){
       if(amasaAccessWatchTimer) clearInterval(amasaAccessWatchTimer);
       amasaAccessWasApproved=false;
       await db.auth.signOut();
-      alert("Akun Anda sudah dihapus oleh Core Adiimasa. Silakan login kembali untuk mengajukan persetujuan akses.");
-      location.href="login.html";
+      showAccessDisabledPopup("Akun Anda sudah dihapus oleh Core Adiimasa. Silakan login kembali untuk mengajukan persetujuan akses.",()=>location.href="login.html");
       return false;
     }
 
@@ -98,8 +115,7 @@ async function enforceAmasaAccessLive(showNotice=true){
       if(amasaAccessWatchTimer) clearInterval(amasaAccessWatchTimer);
       amasaAccessWasApproved=false;
       await db.auth.signOut();
-      alert("Akun AMASA Anda telah dinonaktifkan oleh Core Adiimasa.");
-      location.href="login.html";
+      showAccessDisabledPopup("Akun AMASA Anda telah dinonaktifkan oleh Core Adiimasa.",()=>location.href="login.html");
       return false;
     }
 
