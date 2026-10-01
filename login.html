@@ -23,15 +23,28 @@ async function checkCoreApproval(){
 
   if(accessError) return false;
 
-  /* Jika akun sudah tercatat di Core, status approval menjadi penentu.
-     SUSPENDED/REJECTED/PENDING tidak boleh masuk. */
-  if(accessRows && accessRows.length){
-    const access=accessRows[0];
-    return String(access.approval_status||"").toUpperCase()==="APPROVED" && access.is_active===true;
+  /* Jika akun belum memiliki baris akses, ajukan ulang persetujuan ke Core. */
+  if(!accessRows || !accessRows.length){
+    const {error:requestError}=await db.from("amasa_core_access").insert({
+      user_id:user.id,
+      email:user.email.toLowerCase(),
+      owner_name:user.email,
+      core_name:"PT ADIIMASA DISTRIBUSI INDONESIA",
+      module_slug:"PRODUCT",
+      client_name:"AMASA",
+      role:"admin",
+      approval_status:"PENDING",
+      is_active:false
+    });
+    if(requestError){
+      console.error("AMASA access request:",requestError);
+      return false;
+    }
+    return "PENDING_REQUEST";
   }
 
-  /* Backward compatibility untuk akun lama yang belum memiliki baris approval. */
-  return true;
+  const access=accessRows[0];
+  return String(access.approval_status||"").toUpperCase()==="APPROVED" && access.is_active===true;
 }
 
 async function performManualLogin(){
@@ -48,9 +61,15 @@ async function performManualLogin(){
     msg.textContent="Akses ditolak. Akun ini belum diberi role admin AMASA.";
     return
   }
-  if(!(await checkCoreApproval())){
+  const approvalResult=await checkCoreApproval();
+  if(approvalResult==="PENDING_REQUEST"){
     await db.auth.signOut();
-    msg.textContent="Akses AMASA belum disetujui Core Adiimasa. Silakan hubungi admin Core.";
+    msg.textContent="Permintaan akses sudah dikirim ke Core Adiimasa. Silakan tunggu persetujuan.";
+    return
+  }
+  if(!approvalResult){
+    await db.auth.signOut();
+    msg.textContent="Akses AMASA belum disetujui Core Adiimasa. Silakan tunggu persetujuan.";
     return
   }
   location.href="index.html";
