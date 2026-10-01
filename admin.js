@@ -24,6 +24,33 @@ async function requireAdmin(){
     location.href="login.html";
     return false;
   }
+
+  const {data:accessRows,error:accessError}=await db.from("amasa_core_access")
+    .select("approval_status,is_active,created_at")
+    .eq("module_slug","PRODUCT")
+    .eq("client_name","AMASA")
+    .eq("email",user.email.toLowerCase())
+    .order("created_at",{ascending:false})
+    .limit(1);
+
+  if(accessError){
+    await db.auth.signOut();
+    alert("Status akses AMASA tidak dapat diverifikasi. Silakan coba lagi.");
+    location.href="login.html";
+    return false;
+  }
+
+  if(accessRows && accessRows.length){
+    const access=accessRows[0];
+    const approved=String(access.approval_status||"").toUpperCase()==="APPROVED" && access.is_active===true;
+    if(!approved){
+      await db.auth.signOut();
+      alert("Akses AMASA sedang ditangguhkan atau belum disetujui Core Adiimasa.");
+      location.href="login.html";
+      return false;
+    }
+  }
+
   return true;
 }
 
