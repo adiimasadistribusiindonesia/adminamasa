@@ -600,17 +600,26 @@ function validateContentVideoFile(file) {
 
 function waitForVideoEvent(video, eventName, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
+    const isReady = () => eventName === "loadedmetadata"
+      ? video.readyState >= 1 && Number.isFinite(video.duration)
+      : eventName === "loadeddata"
+        ? video.readyState >= 2 && video.videoWidth > 0
+        : false;
+    let settled = false;
     const timer = setTimeout(() => finish(new Error("Video terlalu lama diproses browser.")), timeoutMs);
-    const onReady = () => finish();
-    const onError = () => finish(new Error("Browser tidak dapat membaca video ini."));
+    const onReady = () => { if (isReady()) finish(); };
+    const onError = () => finish(new Error("Browser tidak dapat membaca video ini (kode " + (video.error?.code || "tidak diketahui") + ")."));
     function finish(error) {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       video.removeEventListener(eventName, onReady);
       video.removeEventListener("error", onError);
       error ? reject(error) : resolve();
     }
-    video.addEventListener(eventName, onReady, { once: true });
-    video.addEventListener("error", onError, { once: true });
+    video.addEventListener(eventName, onReady);
+    video.addEventListener("error", onError);
+    if (isReady()) finish();
   });
 }
 
@@ -629,8 +638,9 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
   let rafId = 0;
   let frameCallbackId = 0;
   try {
+    const metadataReady = waitForVideoEvent(video, "loadedmetadata");
     video.load();
-    await waitForVideoEvent(video, "loadedmetadata");
+    await metadataReady;
     if (!Number.isFinite(video.duration) || video.duration <= 0) {
       throw new Error("Durasi video tidak dapat dibaca.");
     }
