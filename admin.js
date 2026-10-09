@@ -878,13 +878,35 @@ async function uploadContentVideo(file, onProgress){
   const ext = optimized.type.includes("mp4") ? "mp4" : "webm";
   const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+"-"+Math.random().toString(36).slice(2));
   const path = "content/video/" + id + "." + ext;
-  const { error } = await db.storage.from("amasa-products").upload(path, optimized, {
-    upsert: false,
-    contentType: optimized.type || (ext === "mp4" ? "video/mp4" : "video/webm"),
-    cacheControl: "31536000"
+  // Mirror Geparu's proven direct-fetch Storage upload flow.
+  // Use the active Supabase session token and return the real Storage error body.
+  const { data: sessionData, error: sessionError } = await db.auth.getSession();
+  if (sessionError) throw new Error("Gagal membaca sesi login: " + sessionError.message);
+  const accessToken = sessionData?.session?.access_token;
+  if (!accessToken) throw new Error("Sesi login berakhir. Silakan login ulang sebelum upload video.");
+
+  const objectUrl = SUPABASE_URL + "/storage/v1/object/amasa-products/" +
+    path.split("/").map(part => encodeURIComponent(part)).join("/");
+  const response = await fetch(objectUrl, {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + accessToken,
+      "Accept": "application/json",
+      "Content-Type": optimized.type || (ext === "mp4" ? "video/mp4" : "video/webm"),
+      "x-upsert": "false",
+      "cache-control": "31536000"
+    },
+    body: optimized
   });
-  if (error) throw error;
-  return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl;
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error("Storage upload HTTP " + response.status + (detail ? ": " + detail.slice(0, 350) : ""));
+  }
+
+  return SUPABASE_URL + "/storage/v1/object/public/amasa-products/" +
+    path.split("/").map(part => encodeURIComponent(part)).join("/");
 }
 function itemSectionSlug(id){const card=document.querySelector('[data-content-edit="'+id+'"]');return card?.dataset.sectionSlug||"";}
 $("#contentForm").onsubmit=async e=>{
