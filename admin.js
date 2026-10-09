@@ -818,12 +818,14 @@ async function compressContentVideo(file, onProgress) {
   for (const keepAudio of [true, false]) {
     for (const profile of profiles) {
       pass++;
-      onProgress?.("Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " (" + pass + "/" + totalPasses + ")…");
+      const passLabel = "Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " (" + pass + "/" + totalPasses + ")";
+      onProgress?.(passLabel + " — tahap " + Math.round(((pass - 1) / totalPasses) * 100) + "%");
       let result = null;
       for (const mimeType of mimeTypes) {
         try {
           const blob = await recordContentVideoPass(file, profile, mimeType, keepAudio, pct => {
-            onProgress?.("Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " — " + pct + "%");
+            const overallPct = Math.min(99, Math.round(((pass - 1 + pct / 100) / totalPasses) * 100));
+            onProgress?.(passLabel + " — " + pct + "% video · keseluruhan " + overallPct + "%");
           });
           const resultType = blob.type.startsWith("video/") ? blob.type : (mimeType || "video/webm");
           const extension = resultType.includes("mp4") ? "mp4" : "webm";
@@ -835,6 +837,7 @@ async function compressContentVideo(file, onProgress) {
           break;
         } catch (error) {
           lastError = error;
+          onProgress?.("Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " gagal pada percobaan codec: " + (error?.message || "error tidak diketahui"));
         }
       }
       if (!result) continue;
@@ -845,7 +848,10 @@ async function compressContentVideo(file, onProgress) {
       }
     }
   }
-  if (!smallest && lastError) throw lastError;
+  if (!smallest && lastError) {
+    onProgress?.("Kompresi gagal: " + (lastError?.message || "browser tidak dapat membaca video"));
+    throw lastError;
+  }
   throw new Error("Video tetap lebih dari 20 MB setelah kompresi otomatis. Coba video yang lebih pendek. Hasil terkecil: " +
     (smallest ? formatFileSize(smallest.size) : "tidak tersedia") + ".");
 }
