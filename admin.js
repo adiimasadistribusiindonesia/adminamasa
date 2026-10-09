@@ -495,6 +495,7 @@ document.querySelectorAll(".gallery-file").forEach(input=>input.onchange=()=>{co
 
 const AMASA_CONTENT_IMAGE_MAX_SOURCE = 5 * 1024 * 1024;
 const AMASA_CONTENT_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
+const AMASA_CONTENT_VIDEO_MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const AMASA_CONTENT_IMAGE_TARGETS = {
   hero: { maxBytes: 300 * 1024, maxDimension: 1920 },
   about: { maxBytes: 200 * 1024, maxDimension: 1600 },
@@ -608,7 +609,12 @@ function waitForVideoEvent(video, eventName, timeoutMs = 20000) {
     let settled = false;
     const timer = setTimeout(() => finish(new Error("Video terlalu lama diproses browser.")), timeoutMs);
     const onReady = () => { if (isReady()) finish(); };
-    const onError = () => finish(new Error("Browser tidak dapat membaca video ini (kode " + (video.error?.code || "tidak diketahui") + ")."));
+    const onError = () => {
+      const mediaCode = video.error?.code || 0;
+      const error = new Error("Browser tidak dapat membaca video ini (kode " + (mediaCode || "tidak diketahui") + ").");
+      error.mediaErrorCode = mediaCode;
+      finish(error);
+    };
     function finish(error) {
       if (settled) return;
       settled = true;
@@ -837,6 +843,13 @@ async function compressContentVideo(file, onProgress) {
           break;
         } catch (error) {
           lastError = error;
+          if (error?.mediaErrorCode === 4) {
+            if (file.size <= AMASA_CONTENT_VIDEO_MAX_UPLOAD_BYTES) {
+              onProgress?.("Browser HP tidak bisa membaca video untuk kompresi. Mengunggah file asli (" + formatFileSize(file.size) + ") tanpa kompresi…");
+              return file;
+            }
+            throw new Error("Browser HP tidak bisa membaca video untuk kompresi dan ukuran file asli melebihi batas upload 50 MB.");
+          }
           onProgress?.("Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " gagal pada percobaan codec: " + (error?.message || "error tidak diketahui"));
         }
       }
@@ -859,8 +872,8 @@ async function compressContentVideo(file, onProgress) {
 async function uploadContentImage(file,sectionSlug){const optimized=await compressContentImage(file,sectionSlug);const id=(crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));const path="content/"+sectionSlug+"/"+id+".webp";const {error}=await db.storage.from("amasa-products").upload(path,optimized,{upsert:false,contentType:"image/webp",cacheControl:"31536000"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
 async function uploadContentVideo(file, onProgress){
   const optimized = await compressContentVideo(file, onProgress);
-  if (optimized.size > AMASA_CONTENT_VIDEO_MAX_BYTES) {
-    throw new Error("Upload dibatalkan: hasil kompresi masih melebihi 20 MB.");
+  if (optimized.size > AMASA_CONTENT_VIDEO_MAX_UPLOAD_BYTES) {
+    throw new Error("Upload dibatalkan: ukuran video melebihi batas Storage 50 MB.");
   }
   const ext = optimized.type.includes("mp4") ? "mp4" : "webm";
   const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+"-"+Math.random().toString(36).slice(2));
