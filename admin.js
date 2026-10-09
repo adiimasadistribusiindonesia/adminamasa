@@ -627,6 +627,7 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
   let canvasStream = null;
   let recorder = null;
   let rafId = 0;
+  let frameCallbackId = 0;
   try {
     video.load();
     await waitForVideoEvent(video, "loadedmetadata");
@@ -692,7 +693,6 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
     requestCanvasFrame();
     recorder.start(1000);
     let capturedVideoFrames = 1;
-    let frameCallbackId = 0;
     const drawDecodedFrame = () => {
       if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
         try {
