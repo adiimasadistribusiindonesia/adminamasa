@@ -643,7 +643,15 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
     canvas.height = height;
     const context = canvas.getContext("2d", { alpha: false });
     if (!context) throw new Error("Gagal menyiapkan kompresi video.");
-    canvasStream = canvas.captureStream(profile.fps);
+    // Request each canvas frame explicitly. This avoids recordings where the audio track
+    // advances but the canvas video track retains only its initial frame.
+    canvasStream = canvas.captureStream(0);
+    const canvasVideoTrack = canvasStream.getVideoTracks()[0];
+    const requestCanvasFrame = () => {
+      if (canvasVideoTrack && typeof canvasVideoTrack.requestFrame === "function") {
+        try { canvasVideoTrack.requestFrame(); } catch (_) {}
+      }
+    };
     if (keepAudio && typeof video.captureStream === "function") {
       try {
         const sourceStream = video.captureStream();
@@ -662,18 +670,40 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
       recorder.addEventListener("error", () => reject(new Error("Browser gagal mengompres video.")), { once: true });
       recorder.addEventListener("stop", resolve, { once: true });
     });
+    // Paint and request the first real frame before recording starts.
+    await video.play();
+    await new Promise((resolve, reject) => {
+      if (video.readyState >= 2 && video.videoWidth > 0) return resolve();
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("Frame video sumber tidak siap untuk dikompres."));
+      }, 10000);
+      const onFrameReady = () => { cleanup(); resolve(); };
+      const onError = () => { cleanup(); reject(new Error("Gagal membaca frame video sumber.")); };
+      function cleanup() {
+        clearTimeout(timer);
+        video.removeEventListener("loadeddata", onFrameReady);
+        video.removeEventListener("error", onError);
+      }
+      video.addEventListener("loadeddata", onFrameReady, { once: true });
+      video.addEventListener("error", onError, { once: true });
+    });
+    context.drawImage(video, 0, 0, width, height);
+    requestCanvasFrame();
     recorder.start(1000);
     const drawFrame = () => {
-      if (video.readyState >= 2) {
-        context.drawImage(video, 0, 0, width, height);
+      if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+        try {
+          context.drawImage(video, 0, 0, width, height);
+          requestCanvasFrame();
+        } catch (_) {}
       }
       if (!video.ended && recorder.state === "recording") {
         onProgress?.(Math.min(99, Math.round((video.currentTime / video.duration) * 100)));
         rafId = requestAnimationFrame(drawFrame);
       }
     };
-    await video.play();
-    drawFrame();
+    rafId = requestAnimationFrame(drawFrame);
     await new Promise(resolve => {
       video.addEventListener("ended", resolve, { once: true });
       video.addEventListener("error", resolve, { once: true });
