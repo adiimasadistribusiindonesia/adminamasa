@@ -724,6 +724,7 @@ async function compressContentVideo(file, onProgress) {
     for (const profile of profiles) {
       pass++;
       onProgress?.("Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " (" + pass + "/" + totalPasses + ")…");
+      let result = null;
       for (const mimeType of mimeTypes) {
         try {
           const blob = await recordContentVideoPass(file, profile, mimeType, keepAudio, pct => {
@@ -732,19 +733,20 @@ async function compressContentVideo(file, onProgress) {
           const resultType = blob.type.startsWith("video/") ? blob.type : (mimeType || "video/webm");
           const extension = resultType.includes("mp4") ? "mp4" : "webm";
           const baseName = file.name.replace(/\.[^.]+$/, "") || "amasa-video";
-          const result = new File([blob], baseName + "-compressed." + extension, {
+          result = new File([blob], baseName + "-compressed." + extension, {
             type: resultType,
             lastModified: Date.now()
           });
-          if (!smallest || result.size < smallest.size) smallest = result;
-          if (result.size <= AMASA_CONTENT_VIDEO_MAX_BYTES) {
-            onProgress?.("Selesai: " + formatFileSize(result.size) + " (maksimal 20 MB).");
-            return result;
-          }
+          break;
         } catch (error) {
           lastError = error;
-          // Try another recorder format/profile before failing.
         }
+      }
+      if (!result) continue;
+      if (!smallest || result.size < smallest.size) smallest = result;
+      if (result.size <= AMASA_CONTENT_VIDEO_MAX_BYTES) {
+        onProgress?.("Selesai: " + formatFileSize(result.size) + " (maksimal 20 MB).");
+        return result;
       }
     }
   }
