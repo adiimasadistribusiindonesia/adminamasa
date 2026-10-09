@@ -691,25 +691,55 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
     context.drawImage(video, 0, 0, width, height);
     requestCanvasFrame();
     recorder.start(1000);
-    const drawFrame = () => {
+    let capturedVideoFrames = 1;
+    let frameCallbackId = 0;
+    const drawDecodedFrame = () => {
       if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
         try {
           context.drawImage(video, 0, 0, width, height);
           requestCanvasFrame();
+          capturedVideoFrames++;
         } catch (_) {}
       }
-      if (!video.ended && recorder.state === "recording") {
-        onProgress?.(Math.min(99, Math.round((video.currentTime / video.duration) * 100)));
-        rafId = requestAnimationFrame(drawFrame);
+    };
+    const onDecodedFrame = (_now, metadata) => {
+      if (video.ended || recorder.state !== "recording") return;
+      drawDecodedFrame();
+      const currentTime = Number.isFinite(metadata?.mediaTime) ? metadata.mediaTime : video.currentTime;
+      onProgress?.(Math.min(99, Math.round((currentTime / video.duration) * 100)));
+      if (typeof video.requestVideoFrameCallback === "function" && !video.ended && recorder.state === "recording") {
+        frameCallbackId = video.requestVideoFrameCallback(onDecodedFrame);
       }
     };
-    rafId = requestAnimationFrame(drawFrame);
+    // Follow decoded source frames instead of repainting the same canvas frame on every
+    // animation tick. This keeps the canvas video track synchronized with the source media.
+    if (typeof video.requestVideoFrameCallback === "function") {
+      frameCallbackId = video.requestVideoFrameCallback(onDecodedFrame);
+    } else {
+      const drawFrameFallback = () => {
+        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+          const beforeTime = video.currentTime;
+          drawDecodedFrame();
+          if (Math.abs(video.currentTime - beforeTime) < 0.0001) {
+            // Keep polling; some decoders deliver audio and video on slightly different ticks.
+          }
+        }
+        if (!video.ended && recorder.state === "recording") {
+          onProgress?.(Math.min(99, Math.round((video.currentTime / video.duration) * 100)));
+          rafId = requestAnimationFrame(drawFrameFallback);
+        }
+      };
+      rafId = requestAnimationFrame(drawFrameFallback);
+    }
     await new Promise(resolve => {
       video.addEventListener("ended", resolve, { once: true });
       video.addEventListener("error", resolve, { once: true });
     });
     if (recorder.state !== "inactive") recorder.stop();
     await stopped;
+    if (capturedVideoFrames < 2) {
+      throw new Error("Kompresi tidak menangkap frame video yang bergerak. Coba unggah ulang sumber video; hasil ini tidak akan dipakai.");
+    }
     const type = recorder.mimeType || chunks[0]?.type || mimeType || "video/webm";
     let blob = new Blob(chunks, { type });
     if (!blob.size) throw new Error("Hasil kompresi video kosong.");
@@ -738,6 +768,9 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
     return blob;
   } finally {
     if (rafId) cancelAnimationFrame(rafId);
+    if (frameCallbackId && typeof video.cancelVideoFrameCallback === "function") {
+      try { video.cancelVideoFrameCallback(frameCallbackId); } catch (_) {}
+    }
     if (recorder && recorder.state !== "inactive") {
       try { recorder.stop(); } catch (_) {}
     }
