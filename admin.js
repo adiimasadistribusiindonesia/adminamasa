@@ -362,7 +362,7 @@ function renderGalleryAdmin(items=[]){
     list.appendChild(wrap);
     const input=wrap.querySelector(".gallery-file"),img=wrap.querySelector(".gallery-preview"),info=wrap.querySelector(".gallery-info");input.dataset.currentUrl=item?.image_url||"";
     if(item?.image_url){img.src=item.image_url;img.hidden=false;info.textContent="Gambar tersimpan. Pilih file baru untuk menggantinya."}else info.textContent="Belum ada foto";
-    input.onchange=()=>{const f=input.files[0];if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");input.value="";return}img.src=URL.createObjectURL(f);img.hidden=false;info.textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
+    input.onchange=async()=>{const f=input.files[0];if(!f)return;await prepareContentImageInput(input,f,"gallery",img,info)};
     wrap.querySelector(".gallery-remove").onclick=()=>{wrap.remove();[...document.querySelectorAll("#galleryAdminList .gallery-admin-item")].forEach((el,n)=>{el.querySelector("span").textContent="Foto "+(n+1);el.querySelector(".gallery-file").dataset.slot=n;el.querySelector(".gallery-preview").dataset.preview=n;el.querySelector(".gallery-info").dataset.info=n})};
   });
 }
@@ -385,9 +385,9 @@ function renderVideoAdmin(items=[]){
     file.dataset.currentUrl=item?.url||"";
     file.onchange=()=>{
       const f=file.files[0];if(!f)return;
-      if(!f.type.startsWith("video/")||f.size>100*1024*1024){toast("File video harus berupa video dan maksimal 100 MB.");file.value="";return}
+      try{validateContentVideoFile(f)}catch(error){toast(error.message);file.value="";return}
       wrap.querySelector(".video-url").value="";
-      wrap.querySelector(".video-info").textContent=f.name+" • "+Math.round(f.size/1024/1024)+" MB";
+      wrap.querySelector(".video-info").textContent=f.name+" • "+formatFileSize(f.size)+" (batas 50 MB)";
     };
     wrap.querySelector(".video-remove").onclick=()=>{
       wrap.remove();
@@ -489,10 +489,119 @@ $("#addTestimonialItem").onclick=addTestimonialAdminSlot;
 $("#addFaqItem").onclick=addFaqAdminSlot;
 function closeContentModal(){$("#contentModal").hidden=true}
 document.querySelectorAll("[data-content-close]").forEach(b=>b.onclick=closeContentModal);
-$("#contentImage").onchange=()=>{const f=$("#contentImage").files[0];if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");$("#contentImage").value="";return}$("#contentImagePreview").src=URL.createObjectURL(f);$("#contentImagePreview").hidden=false;$("#contentImageInfo").textContent=f.name+" • "+Math.round(f.size/1024)+" KB"};
+$("#contentImage").onchange=async()=>{const input=$("#contentImage"),f=input.files[0];if(!f)return;await prepareContentImageInput(input,f,contentSectionSlug(),$("#contentImagePreview"),$("#contentImageInfo"))};
 document.querySelectorAll(".gallery-file").forEach(input=>input.onchange=()=>{const f=input.files[0],n=input.dataset.slot;if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");input.value="";return}const img=document.querySelector(`.gallery-preview[data-preview="${n}"]`),info=document.querySelector(`.gallery-info[data-info="${n}"]`);if(img){img.src=URL.createObjectURL(f);img.hidden=false}if(info)info.textContent=f.name+" • "+Math.round(f.size/1024)+" KB"});
-async function uploadContentImage(file,sectionSlug){const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";const id=(crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));const path="content/"+sectionSlug+"/"+id+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"image/jpeg",cacheControl:"31536000"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
-async function uploadContentVideo(file){const ext=(file.name.split(".").pop()||"mp4").toLowerCase().replace(/[^a-z0-9]/g,"")||"mp4";const id=(crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));const path="content/video/"+id+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"video/mp4",cacheControl:"31536000"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
+
+const AMASA_CONTENT_IMAGE_MAX_SOURCE = 5 * 1024 * 1024;
+const AMASA_CONTENT_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+const AMASA_CONTENT_IMAGE_TARGETS = {
+  hero: { maxBytes: 300 * 1024, maxDimension: 1920 },
+  about: { maxBytes: 200 * 1024, maxDimension: 1600 },
+  gallery: { maxBytes: 250 * 1024, maxDimension: 1600 }
+};
+
+function contentImageTarget(sectionSlug) {
+  return AMASA_CONTENT_IMAGE_TARGETS[sectionSlug] || { maxBytes: 300 * 1024, maxDimension: 1600 };
+}
+
+function contentSectionSlug() {
+  const name = $("#contentSectionName")?.value || "";
+  if (name === "Tentang AMASA") return "about";
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function formatFileSize(bytes) {
+  return bytes >= 1024 * 1024
+    ? (bytes / (1024 * 1024)).toFixed(2) + " MB"
+    : Math.max(1, Math.round(bytes / 1024)) + " KB";
+}
+
+async function compressContentImage(file, sectionSlug) {
+  if (!file) throw new Error("Pilih gambar terlebih dahulu.");
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    throw new Error("Format gambar harus JPG, PNG, atau WEBP.");
+  }
+  if (file.size > AMASA_CONTENT_IMAGE_MAX_SOURCE) {
+    throw new Error("Ukuran gambar asli maksimal 5 MB sebelum kompresi.");
+  }
+
+  const target = contentImageTarget(sectionSlug);
+  if (file.type === "image/webp" && file.size <= target.maxBytes) return file;
+  if (typeof createImageBitmap !== "function") {
+    throw new Error("Browser ini belum mendukung kompresi gambar otomatis. Gunakan Chrome versi terbaru.");
+  }
+
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+    let scale = Math.min(1, target.maxDimension / Math.max(bitmap.width, bitmap.height));
+    let smallestBlob = null;
+
+    for (let resizePass = 0; resizePass < 8; resizePass++) {
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) throw new Error("Gagal menyiapkan kompresi gambar.");
+      context.drawImage(bitmap, 0, 0, width, height);
+
+      for (const quality of [0.84, 0.76, 0.68, 0.60, 0.52]) {
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(result => result ? resolve(result) : reject(new Error("Gagal mengubah gambar ke WebP.")), "image/webp", quality);
+        });
+        if (!smallestBlob || blob.size < smallestBlob.size) smallestBlob = blob;
+        if (blob.size <= target.maxBytes) {
+          const baseName = file.name.replace(/\.[^.]+$/, "") || "amasa-image";
+          return new File([blob], baseName + ".webp", { type: "image/webp", lastModified: Date.now() });
+        }
+      }
+      scale *= 0.82;
+    }
+
+    if (smallestBlob && smallestBlob.size <= target.maxBytes) {
+      const baseName = file.name.replace(/\.[^.]+$/, "") || "amasa-image";
+      return new File([smallestBlob], baseName + ".webp", { type: "image/webp", lastModified: Date.now() });
+    }
+    throw new Error("Gambar belum bisa mencapai batas " + formatFileSize(target.maxBytes) + ". Pilih gambar yang lebih sederhana atau beresolusi lebih rendah.");
+  } finally {
+    if (bitmap && typeof bitmap.close === "function") bitmap.close();
+  }
+}
+
+async function prepareContentImageInput(input, file, sectionSlug, preview, info) {
+  if (!file) return;
+  try {
+    const optimized = await compressContentImage(file, sectionSlug);
+    input._compressedFile = optimized;
+    if (preview) {
+      preview.src = URL.createObjectURL(optimized);
+      preview.hidden = false;
+    }
+    if (info) {
+      info.textContent = "Asli " + formatFileSize(file.size) + " → WebP " + formatFileSize(optimized.size) +
+        " (batas " + formatFileSize(contentImageTarget(sectionSlug).maxBytes) + ")";
+    }
+  } catch (error) {
+    input.value = "";
+    input._compressedFile = null;
+    if (info) info.textContent = error?.message || "Gagal mengompres gambar.";
+    toast(error?.message || "Gagal mengompres gambar.");
+  }
+}
+
+function validateContentVideoFile(file) {
+  if (!file || !String(file.type || "").startsWith("video/")) {
+    throw new Error("File harus berupa video yang didukung browser.");
+  }
+  if (file.size > AMASA_CONTENT_VIDEO_MAX_BYTES) {
+    throw new Error("Ukuran video maksimal 50 MB. Kompres video terlebih dahulu sebelum upload.");
+  }
+}
+
+async function uploadContentImage(file,sectionSlug){const optimized=await compressContentImage(file,sectionSlug);const id=(crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));const path="content/"+sectionSlug+"/"+id+".webp";const {error}=await db.storage.from("amasa-products").upload(path,optimized,{upsert:false,contentType:"image/webp",cacheControl:"31536000"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
+async function uploadContentVideo(file){validateContentVideoFile(file);const ext=(file.name.split(".").pop()||"mp4").toLowerCase().replace(/[^a-z0-9]/g,"")||"mp4";const id=(crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));const path="content/video/"+id+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"video/mp4",cacheControl:"31536000"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
 function itemSectionSlug(id){const card=document.querySelector('[data-content-edit="'+id+'"]');return card?.dataset.sectionSlug||"";}
 $("#contentForm").onsubmit=async e=>{
  e.preventDefault();const id=$("#contentId").value,saveBtn=$("#saveContent");saveBtn.disabled=true;saveBtn.textContent="Menyimpan...";
@@ -500,7 +609,7 @@ $("#contentForm").onsubmit=async e=>{
   const sectionName=$("#contentSectionName").value,p={title:$("#contentTitle").value.trim()||null,subtitle:$("#contentSubtitle").value.trim()||null,content:$("#contentBody").value.trim()||null,image_url:$("#contentImage").dataset.currentUrl||null,button_text:null,button_url:null,is_active:$("#contentActive").checked,updated_at:new Date().toISOString()};
   if(sectionName==="Galeri"){
    const entries=getGalleryAdminItems(),items=[];
-   for(let n=0;n<entries.length;n++){let url=entries[n].url||"";if(entries[n].input?.files?.[0]){try{url=await uploadContentImage(entries[n].input.files[0],"gallery")}catch(err){throw new Error("Gagal upload Foto "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({image_url:url,label:"PRODUCT GALLERY "+String(items.length+1).padStart(2,"0")})}
+   for(let n=0;n<entries.length;n++){let url=entries[n].url||"";if(entries[n].input?.files?.[0]){try{url=await uploadContentImage(entries[n].input._compressedFile||entries[n].input.files[0],"gallery")}catch(err){throw new Error("Gagal upload Foto "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({image_url:url,label:"PRODUCT GALLERY "+String(items.length+1).padStart(2,"0")})}
    p.content=JSON.stringify({items});p.image_url=null;
   }else if(sectionName==="Video"){
    const entries=getVideoAdminItems(),items=[];
@@ -514,8 +623,8 @@ $("#contentForm").onsubmit=async e=>{
    p.content=JSON.stringify({items});p.image_url=null;
   }else if(sectionName==="Tentang AMASA"){
    p.content=JSON.stringify({paragraph1:$("#aboutParagraph1").value.trim(),paragraph2:$("#aboutParagraph2").value.trim()});
-   const file=$("#contentImage").files[0];if(file)p.image_url=await uploadContentImage(file,"about");
-  }else{const file=$("#contentImage").files[0];if(file)p.image_url=await uploadContentImage(file,sectionName.toLowerCase().replace(/[^a-z0-9]+/g,"-"))}
+   const file=$("#contentImage").files[0];if(file)p.image_url=await uploadContentImage($("#contentImage")._compressedFile||file,"about");
+  }else{const file=$("#contentImage").files[0];if(file)p.image_url=await uploadContentImage($("#contentImage")._compressedFile||file,contentSectionSlug())}
   const r=await db.from("amasa_site_content").update(p).eq("id",id);if(r.error)throw r.error;
   closeContentModal();toast("Konten berhasil diperbarui.");await loadWebsiteContent();
  }catch(err){toast(err?.message||"Gagal menyimpan konten.")}finally{saveBtn.disabled=false;saveBtn.textContent="Simpan Konten"}
