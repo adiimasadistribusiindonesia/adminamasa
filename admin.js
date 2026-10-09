@@ -387,7 +387,7 @@ function renderVideoAdmin(items=[]){
       const f=file.files[0];if(!f)return;
       try{validateContentVideoFile(f)}catch(error){toast(error.message);file.value="";return}
       wrap.querySelector(".video-url").value="";
-      wrap.querySelector(".video-info").textContent=f.name+" • "+formatFileSize(f.size)+" (batas 50 MB)";
+      wrap.querySelector(".video-info").textContent=f.name+" • asli "+formatFileSize(f.size)+" • akan dikompres otomatis saat disimpan (maks. 20 MB)";
     };
     wrap.querySelector(".video-remove").onclick=()=>{
       wrap.remove();
@@ -494,7 +494,7 @@ $("#clearContentImage").onclick=()=>{const input=$("#contentImage");input.value=
 document.querySelectorAll(".gallery-file").forEach(input=>input.onchange=()=>{const f=input.files[0],n=input.dataset.slot;if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");input.value="";return}const img=document.querySelector(`.gallery-preview[data-preview="${n}"]`),info=document.querySelector(`.gallery-info[data-info="${n}"]`);if(img){img.src=URL.createObjectURL(f);img.hidden=false}if(info)info.textContent=f.name+" • "+Math.round(f.size/1024)+" KB"});
 
 const AMASA_CONTENT_IMAGE_MAX_SOURCE = 5 * 1024 * 1024;
-const AMASA_CONTENT_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+const AMASA_CONTENT_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
 const AMASA_CONTENT_IMAGE_TARGETS = {
   hero: { maxBytes: 300 * 1024, maxDimension: 1920 },
   about: { maxBytes: 200 * 1024, maxDimension: 1600 },
@@ -596,13 +596,180 @@ function validateContentVideoFile(file) {
   if (!file || !String(file.type || "").startsWith("video/")) {
     throw new Error("File harus berupa video yang didukung browser.");
   }
-  if (file.size > AMASA_CONTENT_VIDEO_MAX_BYTES) {
-    throw new Error("Ukuran video maksimal 50 MB. Kompres video terlebih dahulu sebelum upload.");
+}
+
+function waitForVideoEvent(video, eventName, timeoutMs = 20000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => finish(new Error("Video terlalu lama diproses browser.")), timeoutMs);
+    const onReady = () => finish();
+    const onError = () => finish(new Error("Browser tidak dapat membaca video ini."));
+    function finish(error) {
+      clearTimeout(timer);
+      video.removeEventListener(eventName, onReady);
+      video.removeEventListener("error", onError);
+      error ? reject(error) : resolve();
+    }
+    video.addEventListener(eventName, onReady, { once: true });
+    video.addEventListener("error", onError, { once: true });
+  });
+}
+
+async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProgress) {
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
+    throw new Error("Browser ini belum mendukung kompresi video otomatis. Gunakan Chrome desktop versi terbaru.");
+  }
+  const sourceUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.preload = "auto";
+  video.playsInline = true;
+  video.muted = true;
+  video.src = sourceUrl;
+  let canvasStream = null;
+  let recorder = null;
+  let rafId = 0;
+  try {
+    video.load();
+    await waitForVideoEvent(video, "loadedmetadata");
+    if (!Number.isFinite(video.duration) || video.duration <= 0) {
+      throw new Error("Durasi video tidak dapat dibaca.");
+    }
+    const sourceWidth = video.videoWidth || 1280;
+    const sourceHeight = video.videoHeight || 720;
+    const scale = Math.min(1, profile.maxDimension / Math.max(sourceWidth, sourceHeight));
+    const width = Math.max(2, Math.floor(sourceWidth * scale / 2) * 2);
+    const height = Math.max(2, Math.floor(sourceHeight * scale / 2) * 2);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Gagal menyiapkan kompresi video.");
+    canvasStream = canvas.captureStream(profile.fps);
+    if (keepAudio && typeof video.captureStream === "function") {
+      try {
+        const sourceStream = video.captureStream();
+        sourceStream.getAudioTracks().forEach(track => canvasStream.addTrack(track));
+      } catch (_) {}
+    }
+    const options = { videoBitsPerSecond: profile.videoBitrate };
+    if (keepAudio) options.audioBitsPerSecond = 64000;
+    if (mimeType && MediaRecorder.isTypeSupported(mimeType)) options.mimeType = mimeType;
+    recorder = new MediaRecorder(canvasStream, options);
+    const chunks = [];
+    const stopped = new Promise((resolve, reject) => {
+      recorder.addEventListener("dataavailable", event => {
+        if (event.data && event.data.size) chunks.push(event.data);
+      });
+      recorder.addEventListener("error", () => reject(new Error("Browser gagal mengompres video.")), { once: true });
+      recorder.addEventListener("stop", resolve, { once: true });
+    });
+    recorder.start(1000);
+    const drawFrame = () => {
+      if (video.readyState >= 2) {
+        context.drawImage(video, 0, 0, width, height);
+      }
+      if (!video.ended && recorder.state === "recording") {
+        onProgress?.(Math.min(99, Math.round((video.currentTime / video.duration) * 100)));
+        rafId = requestAnimationFrame(drawFrame);
+      }
+    };
+    await video.play();
+    drawFrame();
+    await new Promise(resolve => {
+      video.addEventListener("ended", resolve, { once: true });
+      video.addEventListener("error", resolve, { once: true });
+    });
+    if (recorder.state !== "inactive") recorder.stop();
+    await stopped;
+    const type = recorder.mimeType || chunks[0]?.type || mimeType || "video/webm";
+    const blob = new Blob(chunks, { type });
+    if (!blob.size) throw new Error("Hasil kompresi video kosong.");
+    return blob;
+  } finally {
+    if (rafId) cancelAnimationFrame(rafId);
+    if (recorder && recorder.state !== "inactive") {
+      try { recorder.stop(); } catch (_) {}
+    }
+    if (canvasStream) canvasStream.getTracks().forEach(track => track.stop());
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(sourceUrl);
   }
 }
 
+async function compressContentVideo(file, onProgress) {
+  validateContentVideoFile(file);
+  if (file.size <= AMASA_CONTENT_VIDEO_MAX_BYTES) {
+    // Even small videos are re-encoded so uploaded video format/size follows the same policy.
+  }
+  const profiles = [
+    { label: "720p", maxDimension: 720, fps: 24, videoBitrate: 1000000 },
+    { label: "640p", maxDimension: 640, fps: 24, videoBitrate: 650000 },
+    { label: "480p", maxDimension: 480, fps: 20, videoBitrate: 400000 },
+    { label: "360p", maxDimension: 360, fps: 18, videoBitrate: 250000 }
+  ];
+  const mimeTypes = [
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=vp9,opus",
+    "video/webm",
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4"
+  ].filter(type => MediaRecorder.isTypeSupported(type));
+  if (!mimeTypes.length) mimeTypes.push("");
+  let smallest = null;
+  let lastError = null;
+  const totalPasses = profiles.length * 2;
+  let pass = 0;
+  for (const keepAudio of [true, false]) {
+    for (const profile of profiles) {
+      pass++;
+      onProgress?.("Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " (" + pass + "/" + totalPasses + ")…");
+      for (const mimeType of mimeTypes) {
+        try {
+          const blob = await recordContentVideoPass(file, profile, mimeType, keepAudio, pct => {
+            onProgress?.("Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " — " + pct + "%");
+          });
+          const resultType = blob.type.startsWith("video/") ? blob.type : (mimeType || "video/webm");
+          const extension = resultType.includes("mp4") ? "mp4" : "webm";
+          const baseName = file.name.replace(/\.[^.]+$/, "") || "amasa-video";
+          const result = new File([blob], baseName + "-compressed." + extension, {
+            type: resultType,
+            lastModified: Date.now()
+          });
+          if (!smallest || result.size < smallest.size) smallest = result;
+          if (result.size <= AMASA_CONTENT_VIDEO_MAX_BYTES) {
+            onProgress?.("Selesai: " + formatFileSize(result.size) + " (maksimal 20 MB).");
+            return result;
+          }
+        } catch (error) {
+          lastError = error;
+          // Try another recorder format/profile before failing.
+        }
+      }
+    }
+  }
+  if (!smallest && lastError) throw lastError;
+  throw new Error("Video tetap lebih dari 20 MB setelah kompresi otomatis. Coba video yang lebih pendek. Hasil terkecil: " +
+    (smallest ? formatFileSize(smallest.size) : "tidak tersedia") + ".");
+}
+
 async function uploadContentImage(file,sectionSlug){const optimized=await compressContentImage(file,sectionSlug);const id=(crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));const path="content/"+sectionSlug+"/"+id+".webp";const {error}=await db.storage.from("amasa-products").upload(path,optimized,{upsert:false,contentType:"image/webp",cacheControl:"31536000"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
-async function uploadContentVideo(file){validateContentVideoFile(file);const ext=(file.name.split(".").pop()||"mp4").toLowerCase().replace(/[^a-z0-9]/g,"")||"mp4";const id=(crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+"-"+Math.random().toString(36).slice(2));const path="content/video/"+id+"."+ext;const {error}=await db.storage.from("amasa-products").upload(path,file,{upsert:false,contentType:file.type||"video/mp4",cacheControl:"31536000"});if(error)throw error;return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl}
+async function uploadContentVideo(file, onProgress){
+  const optimized = await compressContentVideo(file, onProgress);
+  if (optimized.size > AMASA_CONTENT_VIDEO_MAX_BYTES) {
+    throw new Error("Upload dibatalkan: hasil kompresi masih melebihi 20 MB.");
+  }
+  const ext = optimized.type.includes("mp4") ? "mp4" : "webm";
+  const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+"-"+Math.random().toString(36).slice(2));
+  const path = "content/video/" + id + "." + ext;
+  const { error } = await db.storage.from("amasa-products").upload(path, optimized, {
+    upsert: false,
+    contentType: optimized.type || (ext === "mp4" ? "video/mp4" : "video/webm"),
+    cacheControl: "31536000"
+  });
+  if (error) throw error;
+  return db.storage.from("amasa-products").getPublicUrl(path).data.publicUrl;
+}
 function itemSectionSlug(id){const card=document.querySelector('[data-content-edit="'+id+'"]');return card?.dataset.sectionSlug||"";}
 $("#contentForm").onsubmit=async e=>{
  e.preventDefault();const id=$("#contentId").value,saveBtn=$("#saveContent");saveBtn.disabled=true;saveBtn.textContent="Menyimpan...";
@@ -614,7 +781,7 @@ $("#contentForm").onsubmit=async e=>{
    p.content=JSON.stringify({items});p.image_url=null;
   }else if(sectionName==="Video"){
    const entries=getVideoAdminItems(),items=[];
-   for(let n=0;n<entries.length;n++){let url=entries[n].url||entries[n].file?.dataset.currentUrl||"";if(entries[n].file?.files?.[0]){try{url=await uploadContentVideo(entries[n].file.files[0])}catch(err){throw new Error("Gagal upload Video "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({title:entries[n].title||"Video AMASA",url})}
+   for(let n=0;n<entries.length;n++){let url=entries[n].url||entries[n].file?.dataset.currentUrl||"";if(entries[n].file?.files?.[0]){const info=entries[n].file.closest(".video-admin-item")?.querySelector(".video-info");try{url=await uploadContentVideo(entries[n].file.files[0],message=>{if(info)info.textContent=message})}catch(err){throw new Error("Gagal upload Video "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({title:entries[n].title||"Video AMASA",url})}
    p.content=JSON.stringify({items});p.image_url=null;
   }else if(sectionName==="FAQ"){
    const items=getFaqAdminItems();
