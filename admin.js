@@ -697,9 +697,7 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
     recorder = new MediaRecorder(canvasStream, options);
 
     const chunks = [];
-    let rejectRecording;
     const stopped = new Promise((resolve, reject) => {
-      rejectRecording = reject;
       recorder.addEventListener("dataavailable", event => {
         if (event.data && event.data.size) chunks.push(event.data);
       });
