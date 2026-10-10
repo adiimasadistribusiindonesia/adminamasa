@@ -885,11 +885,7 @@ async function compressContentVideo(file, onProgress) {
         } catch (error) {
           lastError = error;
           if (error?.mediaErrorCode === 4) {
-            if (file.size <= AMASA_CONTENT_VIDEO_MAX_UPLOAD_BYTES) {
-              onProgress?.("Browser HP tidak bisa membaca video untuk kompresi. Mengunggah file asli (" + formatFileSize(file.size) + ") tanpa kompresi…");
-              return file;
-            }
-            throw new Error("Browser HP tidak bisa membaca video untuk kompresi dan ukuran file asli melebihi batas upload 50 MB.");
+            throw new Error("Browser ini tidak dapat mengompres video secara otomatis hingga 30 MB. Coba gunakan Chrome desktop terbaru atau kompres file terlebih dahulu di komputer.");
           }
           onProgress?.("Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " gagal pada percobaan codec: " + (error?.message || "error tidak diketahui"));
         }
