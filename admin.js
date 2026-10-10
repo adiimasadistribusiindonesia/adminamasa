@@ -743,11 +743,14 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
       video.addEventListener("error", onError, { once: true });
     });
 
-    // Start the source first and paint a real frame before recording.
-    await video.play();
-    context.drawImage(video, 0, 0, width, height);
-    capturedVideoFrames++;
+    // Match GEPARU's proven ordering: start MediaRecorder first, then start
+    // source playback, so audio and canvas video enter the same recording window.
     recorder.start(250);
+    await video.play();
+    try {
+      context.drawImage(video, 0, 0, width, height);
+      capturedVideoFrames++;
+    } catch (_) {}
     rafId = requestAnimationFrame(drawFrame);
 
     // Keep status visibly alive during encoding/rendering without inventing
