@@ -831,8 +831,12 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
 
 async function compressContentVideo(file, onProgress) {
   validateContentVideoFile(file);
-  if (file.size <= AMASA_CONTENT_VIDEO_MAX_BYTES) {
-    // Even small videos are re-encoded so uploaded video format/size follows the same policy.
+  // Preserve the source video bit-for-bit whenever it fits Storage. Browser
+  // canvas/MediaRecorder transcoding can introduce uneven frame pacing and
+  // audio/video drift, so do not re-encode normal-sized videos.
+  if (file.size <= AMASA_CONTENT_VIDEO_MAX_UPLOAD_BYTES) {
+    onProgress?.("Video siap diunggah tanpa pengodean ulang");
+    return file;
   }
   const profiles = [
     { label: "720p", maxDimension: 720, fps: 24, videoBitrate: 1000000 },
