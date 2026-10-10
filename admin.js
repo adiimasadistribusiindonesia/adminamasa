@@ -633,25 +633,38 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
     throw new Error("Browser ini belum mendukung kompresi video otomatis. Gunakan Chrome desktop versi terbaru.");
   }
+
   const sourceUrl = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.preload = "auto";
   video.playsInline = true;
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
   video.muted = true;
+  video.defaultMuted = true;
   video.src = sourceUrl;
+
   let canvasStream = null;
+  let sourceStream = null;
   let recorder = null;
   let rafId = 0;
-  let frameCallbackId = 0;
+  let capturedVideoFrames = 0;
+
   try {
     const metadataReady = waitForVideoEvent(video, "loadedmetadata");
     video.load();
     await metadataReady;
+    await waitForVideoEvent(video, "loadeddata");
+
     if (!Number.isFinite(video.duration) || video.duration <= 0) {
       throw new Error("Durasi video tidak dapat dibaca.");
     }
-    const sourceWidth = video.videoWidth || 1280;
-    const sourceHeight = video.videoHeight || 720;
+    if (!video.videoWidth || !video.videoHeight) {
+      throw new Error("Ukuran frame video tidak dapat dibaca.");
+    }
+
+    const sourceWidth = video.videoWidth;
+    const sourceHeight = video.videoHeight;
     const scale = Math.min(1, profile.maxDimension / Math.max(sourceWidth, sourceHeight));
     const width = Math.max(2, Math.floor(sourceWidth * scale / 2) * 2);
     const height = Math.max(2, Math.floor(sourceHeight * scale / 2) * 2);
@@ -660,140 +673,110 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
     canvas.height = height;
     const context = canvas.getContext("2d", { alpha: false });
     if (!context) throw new Error("Gagal menyiapkan kompresi video.");
-    // Request each canvas frame explicitly. This avoids recordings where the audio track
-    // advances but the canvas video track retains only its initial frame.
-    canvasStream = canvas.captureStream(0);
-    const canvasVideoTrack = canvasStream.getVideoTracks()[0];
-    const requestCanvasFrame = () => {
-      if (canvasVideoTrack && typeof canvasVideoTrack.requestFrame === "function") {
-        try { canvasVideoTrack.requestFrame(); } catch (_) {}
-      }
-    };
-    if (keepAudio && typeof video.captureStream === "function") {
+
+    // Samakan mekanisme pengambilan frame dengan GEPARU Aduan Sosial:
+    // canvas.captureStream(fps) + drawImage melalui requestAnimationFrame.
+    // Ini menghindari ketergantungan pada requestFrame() atau callback decoder khusus.
+    canvasStream = canvas.captureStream(profile.fps || 24);
+
+    if (keepAudio) {
       try {
-        const sourceStream = video.captureStream();
-        sourceStream.getAudioTracks().forEach(track => canvasStream.addTrack(track));
+        if (typeof video.captureStream === "function") sourceStream = video.captureStream();
+        else if (typeof video.mozCaptureStream === "function") sourceStream = video.mozCaptureStream();
+        if (sourceStream) {
+          sourceStream.getAudioTracks().forEach(track => {
+            try { canvasStream.addTrack(track); } catch (_) {}
+          });
+        }
       } catch (_) {}
     }
+
     const options = { videoBitsPerSecond: profile.videoBitrate };
     if (keepAudio) options.audioBitsPerSecond = 64000;
     if (mimeType && MediaRecorder.isTypeSupported(mimeType)) options.mimeType = mimeType;
     recorder = new MediaRecorder(canvasStream, options);
+
     const chunks = [];
+    let rejectRecording;
     const stopped = new Promise((resolve, reject) => {
+      rejectRecording = reject;
       recorder.addEventListener("dataavailable", event => {
         if (event.data && event.data.size) chunks.push(event.data);
       });
       recorder.addEventListener("error", () => reject(new Error("Browser gagal mengompres video.")), { once: true });
       recorder.addEventListener("stop", resolve, { once: true });
     });
-    // Paint and request the first real frame before recording starts.
-    await video.play();
-    await new Promise((resolve, reject) => {
-      if (video.readyState >= 2 && video.videoWidth > 0) return resolve();
-      const timer = setTimeout(() => {
-        cleanup();
-        reject(new Error("Frame video sumber tidak siap untuk dikompres."));
-      }, 10000);
-      const onFrameReady = () => { cleanup(); resolve(); };
-      const onError = () => { cleanup(); reject(new Error("Gagal membaca frame video sumber.")); };
-      function cleanup() {
-        clearTimeout(timer);
-        video.removeEventListener("loadeddata", onFrameReady);
-        video.removeEventListener("error", onError);
-      }
-      video.addEventListener("loadeddata", onFrameReady, { once: true });
-      video.addEventListener("error", onError, { once: true });
-    });
-    context.drawImage(video, 0, 0, width, height);
-    requestCanvasFrame();
-    recorder.start(1000);
-    let capturedVideoFrames = 1;
-    const drawDecodedFrame = () => {
+
+    const drawFrame = () => {
       if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
         try {
           context.drawImage(video, 0, 0, width, height);
-          requestCanvasFrame();
           capturedVideoFrames++;
         } catch (_) {}
       }
-    };
-    const onDecodedFrame = (_now, metadata) => {
-      if (video.ended || recorder.state !== "recording") return;
-      drawDecodedFrame();
-      const currentTime = Number.isFinite(metadata?.mediaTime) ? metadata.mediaTime : video.currentTime;
-      onProgress?.(Math.min(99, Math.round((currentTime / video.duration) * 100)));
-      if (typeof video.requestVideoFrameCallback === "function" && !video.ended && recorder.state === "recording") {
-        frameCallbackId = video.requestVideoFrameCallback(onDecodedFrame);
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      const currentTime = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+      if (duration > 0) {
+        onProgress?.(Math.min(99, Math.round((currentTime / duration) * 100)));
+      }
+      if (!video.ended && recorder.state === "recording") {
+        rafId = requestAnimationFrame(drawFrame);
+      } else if (recorder.state !== "inactive") {
+        try { recorder.stop(); } catch (_) {}
       }
     };
-    // Follow decoded source frames instead of repainting the same canvas frame on every
-    // animation tick. This keeps the canvas video track synchronized with the source media.
-    if (typeof video.requestVideoFrameCallback === "function") {
-      frameCallbackId = video.requestVideoFrameCallback(onDecodedFrame);
-    } else {
-      const drawFrameFallback = () => {
-        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-          const beforeTime = video.currentTime;
-          drawDecodedFrame();
-          if (Math.abs(video.currentTime - beforeTime) < 0.0001) {
-            // Keep polling; some decoders deliver audio and video on slightly different ticks.
-          }
-        }
-        if (!video.ended && recorder.state === "recording") {
-          onProgress?.(Math.min(99, Math.round((video.currentTime / video.duration) * 100)));
-          rafId = requestAnimationFrame(drawFrameFallback);
-        }
+
+    // Start the source first and paint a real frame before recording.
+    await video.play();
+    context.drawImage(video, 0, 0, width, height);
+    capturedVideoFrames++;
+    recorder.start(250);
+    rafId = requestAnimationFrame(drawFrame);
+
+    const ended = new Promise((resolve, reject) => {
+      const onEnded = () => { cleanup(); resolve(); };
+      const onError = () => {
+        cleanup();
+        const code = video.error?.code || 0;
+        const error = new Error("Gagal membaca frame video sumber (kode " + (code || "tidak diketahui") + ").");
+        error.mediaErrorCode = code;
+        reject(error);
       };
-      rafId = requestAnimationFrame(drawFrameFallback);
-    }
-    await new Promise(resolve => {
-      video.addEventListener("ended", resolve, { once: true });
-      video.addEventListener("error", resolve, { once: true });
+      function cleanup() {
+        video.removeEventListener("ended", onEnded);
+        video.removeEventListener("error", onError);
+      }
+      video.addEventListener("ended", onEnded, { once: true });
+      video.addEventListener("error", onError, { once: true });
     });
+
+    const maxWaitMs = Math.min(Math.max(Math.ceil(video.duration * 1000) + 10000, 15000), 10 * 60 * 1000);
+    await Promise.race([
+      ended,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Waktu pemrosesan video habis.")), maxWaitMs))
+    ]);
+
     if (recorder.state !== "inactive") recorder.stop();
     await stopped;
+
     if (capturedVideoFrames < 2) {
-      throw new Error("Kompresi tidak menangkap frame video yang bergerak. Coba unggah ulang sumber video; hasil ini tidak akan dipakai.");
+      throw new Error("Kompresi tidak menangkap frame video yang bergerak. Hasil ini tidak akan dipakai.");
     }
+
     const type = recorder.mimeType || chunks[0]?.type || mimeType || "video/webm";
-    let blob = new Blob(chunks, { type });
+    const blob = new Blob(chunks, { type });
     if (!blob.size) throw new Error("Hasil kompresi video kosong.");
-    if (blob.type.includes("webm")) {
-      onProgress?.("Memperbaiki metadata durasi dan navigasi video…");
-      if (!window.EBML?.Decoder || !window.EBML?.Reader || !window.EBML?.tools?.makeMetadataSeekable) {
-        throw new Error("Modul perbaikan metadata WebM tidak tersedia. Muat ulang halaman admin lalu coba lagi.");
-      }
-      const decoder = new window.EBML.Decoder();
-      const reader = new window.EBML.Reader();
-      const streamReader = blob.stream().getReader();
-      while (true) {
-        const part = await streamReader.read();
-        if (part.done) {
-          reader.stop();
-          break;
-        }
-        let elements = decoder.decode(part.value);
-        elements = elements?.filter(element => element.type !== "unknown") || [];
-        elements.forEach(element => reader.read(element));
-      }
-      const metadata = window.EBML.tools.makeMetadataSeekable(reader.metadatas, reader.duration, reader.cues);
-      blob = new Blob([metadata, blob.slice(reader.metadataSize)], { type: blob.type });
-      if (!blob.size) throw new Error("Perbaikan metadata video gagal.");
-    }
     return blob;
   } finally {
     if (rafId) cancelAnimationFrame(rafId);
-    if (frameCallbackId && typeof video.cancelVideoFrameCallback === "function") {
-      try { video.cancelVideoFrameCallback(frameCallbackId); } catch (_) {}
-    }
     if (recorder && recorder.state !== "inactive") {
       try { recorder.stop(); } catch (_) {}
     }
-    if (canvasStream) canvasStream.getTracks().forEach(track => track.stop());
-    video.pause();
+    if (sourceStream) sourceStream.getTracks().forEach(track => { try { track.stop(); } catch (_) {} });
+    if (canvasStream) canvasStream.getTracks().forEach(track => { try { track.stop(); } catch (_) {} });
+    try { video.pause(); } catch (_) {}
     video.removeAttribute("src");
-    video.load();
+    try { video.load(); } catch (_) {}
     URL.revokeObjectURL(sourceUrl);
   }
 }
