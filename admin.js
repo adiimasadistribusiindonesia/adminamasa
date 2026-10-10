@@ -649,6 +649,8 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
   let recorder = null;
   let rafId = 0;
   let capturedVideoFrames = 0;
+  let progressHeartbeat = 0;
+  let heartbeatTicks = 0;
 
   try {
     const metadataReady = waitForVideoEvent(video, "loadedmetadata");
@@ -715,7 +717,7 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
       const duration = Number.isFinite(video.duration) ? video.duration : 0;
       const currentTime = Number.isFinite(video.currentTime) ? video.currentTime : 0;
       if (duration > 0) {
-        onProgress?.(Math.min(99, Math.round((currentTime / duration) * 100)));
+        onProgress?.(Math.min(99, Math.round((currentTime / duration) * 100)), "Merekam frame video");
       }
       if (!video.ended && recorder.state === "recording") {
         rafId = requestAnimationFrame(drawFrame);
@@ -748,7 +750,19 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
     recorder.start(250);
     rafId = requestAnimationFrame(drawFrame);
 
-
+    // Keep status visibly alive during encoding/rendering without inventing
+    // progress percentages. Percentages still follow the real source time.
+    const heartbeatStartedAt = Date.now();
+    progressHeartbeat = window.setInterval(() => {
+      if (video.ended || recorder.state !== "recording") return;
+      heartbeatTicks = (heartbeatTicks + 1) % 4;
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      const currentTime = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+      const pct = duration > 0 ? Math.min(99, Math.round((currentTime / duration) * 100)) : 0;
+      const dots = ["", ".", "..", "..."][heartbeatTicks];
+      const elapsed = Math.max(1, Math.floor((Date.now() - heartbeatStartedAt) / 1000));
+      onProgress?.(pct, "Merender frame" + dots + " (" + elapsed + " dtk)");
+    }, 800);
 
     const maxWaitMs = Math.min(Math.max(Math.ceil(video.duration * 1000) + 10000, 15000), 10 * 60 * 1000);
     let timeoutId;
@@ -774,7 +788,7 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
     let blob = new Blob(chunks, { type });
     if (!blob.size) throw new Error("Hasil kompresi video kosong.");
     if (blob.type.includes("webm")) {
-      onProgress?.("Memperbaiki metadata durasi dan navigasi video…");
+      onProgress?.(99, "Menyusun metadata durasi dan navigasi video");
       if (!window.EBML?.Decoder || !window.EBML?.Reader || !window.EBML?.tools?.makeMetadataSeekable) {
         throw new Error("Modul perbaikan metadata WebM tidak tersedia. Muat ulang halaman admin lalu coba lagi.");
       }
@@ -795,8 +809,10 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
       blob = new Blob([metadata, blob.slice(reader.metadataSize)], { type: blob.type });
       if (!blob.size) throw new Error("Perbaikan metadata video gagal.");
     }
+    onProgress?.(100, "Render percobaan selesai");
     return blob;
   } finally {
+    if (progressHeartbeat) clearInterval(progressHeartbeat);
     if (rafId) cancelAnimationFrame(rafId);
     if (recorder && recorder.state !== "inactive") {
       try { recorder.stop(); } catch (_) {}
@@ -841,9 +857,9 @@ async function compressContentVideo(file, onProgress) {
       let result = null;
       for (const mimeType of mimeTypes) {
         try {
-          const blob = await recordContentVideoPass(file, profile, mimeType, keepAudio, pct => {
+          const blob = await recordContentVideoPass(file, profile, mimeType, keepAudio, (pct, stage = "Memproses video") => {
             const overallPct = Math.min(99, Math.round(((pass - 1 + pct / 100) / totalPasses) * 100));
-            onProgress?.(passLabel + " — " + pct + "% video · keseluruhan " + overallPct + "%");
+            onProgress?.(passLabel + " — " + pct + "% video · keseluruhan " + overallPct + "% · " + stage);
           });
           const resultType = blob.type.startsWith("video/") ? blob.type : (mimeType || "video/webm");
           const extension = resultType.includes("mp4") ? "mp4" : "webm";
