@@ -726,13 +726,6 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
       }
     };
 
-    // Start the source first and paint a real frame before recording.
-    await video.play();
-    context.drawImage(video, 0, 0, width, height);
-    capturedVideoFrames++;
-    recorder.start(250);
-    rafId = requestAnimationFrame(drawFrame);
-
     const ended = new Promise((resolve, reject) => {
       const onEnded = () => { cleanup(); resolve(); };
       const onError = () => {
@@ -750,11 +743,27 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
       video.addEventListener("error", onError, { once: true });
     });
 
+    // Start the source first and paint a real frame before recording.
+    await video.play();
+    context.drawImage(video, 0, 0, width, height);
+    capturedVideoFrames++;
+    recorder.start(250);
+    rafId = requestAnimationFrame(drawFrame);
+
+
+
     const maxWaitMs = Math.min(Math.max(Math.ceil(video.duration * 1000) + 10000, 15000), 10 * 60 * 1000);
-    await Promise.race([
-      ended,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Waktu pemrosesan video habis.")), maxWaitMs))
-    ]);
+    let timeoutId;
+    try {
+      await Promise.race([
+        ended,
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("Waktu pemrosesan video habis.")), maxWaitMs);
+        })
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
 
     if (recorder.state !== "inactive") recorder.stop();
     await stopped;
