@@ -387,7 +387,7 @@ function renderVideoAdmin(items=[]){
       const f=file.files[0];if(!f)return;
       try{validateContentVideoFile(f)}catch(error){toast(error.message);file.value="";return}
       wrap.querySelector(".video-url").value="";
-      wrap.querySelector(".video-info").textContent=f.name+" • asli "+formatFileSize(f.size)+" • akan dikompres otomatis saat disimpan (maks. 20 MB)";
+      wrap.querySelector(".video-info").textContent=f.name+" • asli "+formatFileSize(f.size)+(f.size>AMASA_CONTENT_VIDEO_MAX_BYTES?" • akan dikompres otomatis saat disimpan (maks. 30 MB)":" • ukuran sesuai batas 30 MB");
     };
     wrap.querySelector(".video-remove").onclick=()=>{
       wrap.remove();
@@ -494,7 +494,7 @@ $("#clearContentImage").onclick=()=>{const input=$("#contentImage");input.value=
 document.querySelectorAll(".gallery-file").forEach(input=>input.onchange=()=>{const f=input.files[0],n=input.dataset.slot;if(!f)return;if(!f.type.startsWith("image/")||f.size>5*1024*1024){toast("File gambar tidak valid atau lebih dari 5 MB.");input.value="";return}const img=document.querySelector(`.gallery-preview[data-preview="${n}"]`),info=document.querySelector(`.gallery-info[data-info="${n}"]`);if(img){img.src=URL.createObjectURL(f);img.hidden=false}if(info)info.textContent=f.name+" • "+Math.round(f.size/1024)+" KB"});
 
 const AMASA_CONTENT_IMAGE_MAX_SOURCE = 5 * 1024 * 1024;
-const AMASA_CONTENT_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
+const AMASA_CONTENT_VIDEO_MAX_BYTES = 30 * 1024 * 1024;
 const AMASA_CONTENT_VIDEO_MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const AMASA_CONTENT_IMAGE_TARGETS = {
   hero: { maxBytes: 300 * 1024, maxDimension: 1920 },
@@ -831,14 +831,13 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
 
 async function compressContentVideo(file, onProgress) {
   validateContentVideoFile(file);
-  // Preserve the source video bit-for-bit. Browser canvas/MediaRecorder
-  // transcoding has caused uneven frame pacing and audio/video drift, so
-  // never transcode here when playback stability is the priority.
-  if (file.size > AMASA_CONTENT_VIDEO_MAX_UPLOAD_BYTES) {
-    throw new Error("Ukuran video asli melebihi 50 MB. Agar pemutaran tetap lancar, kompres video terlebih dahulu hingga maksimal 50 MB lalu unggah kembali.");
+  // Keep original encoding for videos already within the 30 MB target.
+  // Larger videos use the automatic browser compression profiles below.
+  if (file.size <= AMASA_CONTENT_VIDEO_MAX_BYTES) {
+    onProgress?.("Video sudah memenuhi batas 30 MB");
+    return file;
   }
-  onProgress?.("Video siap diunggah tanpa pengodean ulang");
-  return file;
+  onProgress?.("Sedang menyiapkan kompresi otomatis hingga 30 MB");
   const profiles = [
     { label: "720p", maxDimension: 720, fps: 24, videoBitrate: 1000000 },
     { label: "640p", maxDimension: 640, fps: 24, videoBitrate: 650000 },
@@ -900,7 +899,7 @@ async function compressContentVideo(file, onProgress) {
       if (result.size <= AMASA_CONTENT_VIDEO_MAX_BYTES) {
         lastReportedOverallPct = 100;
         onProgress?.("Sedang mengompres video 100%");
-        onProgress?.("Selesai: " + formatFileSize(result.size) + " (maksimal 20 MB).");
+        onProgress?.("Selesai: " + formatFileSize(result.size) + " (maksimal 30 MB).");
         return result;
       }
     }
@@ -909,7 +908,7 @@ async function compressContentVideo(file, onProgress) {
     onProgress?.("Kompresi gagal: " + (lastError?.message || "browser tidak dapat membaca video"));
     throw lastError;
   }
-  throw new Error("Video tetap lebih dari 20 MB setelah kompresi otomatis. Coba video yang lebih pendek. Hasil terkecil: " +
+  throw new Error("Video tetap lebih dari 30 MB setelah kompresi otomatis. Coba video yang lebih pendek. Hasil terkecil: " +
     (smallest ? formatFileSize(smallest.size) : "tidak tersedia") + ".");
 }
 
