@@ -856,13 +856,13 @@ async function compressContentVideo(file, onProgress) {
     for (const profile of profiles) {
       pass++;
       const passLabel = "Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " (" + pass + "/" + totalPasses + ")";
-      onProgress?.(passLabel + " — tahap " + Math.round(((pass - 1) / totalPasses) * 100) + "%");
+      onProgress?.("Sedang mengompres video 0%");
       let result = null;
       for (const mimeType of mimeTypes) {
         try {
-          const blob = await recordContentVideoPass(file, profile, mimeType, keepAudio, (pct, stage = "Memproses video") => {
-            const overallPct = Math.min(99, Math.round(((pass - 1 + pct / 100) / totalPasses) * 100));
-            onProgress?.(passLabel + " — " + pct + "% video · keseluruhan " + overallPct + "% · " + stage);
+          const blob = await recordContentVideoPass(file, profile, mimeType, keepAudio, pct => {
+            const percent = Math.max(0, Math.min(99, Math.round(pct)));
+            onProgress?.("Sedang mengompres video " + percent + "%");
           });
           const resultType = blob.type.startsWith("video/") ? blob.type : (mimeType || "video/webm");
           const extension = resultType.includes("mp4") ? "mp4" : "webm";
