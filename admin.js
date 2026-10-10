@@ -357,17 +357,38 @@ async function loadWebsiteContent(){
 function renderGalleryAdmin(items=[]){
   const list=$("#galleryAdminList");if(!list)return;list.innerHTML="";
   (Array.isArray(items)?items:[]).forEach((item,index)=>{
-    const wrap=document.createElement("label");wrap.className="gallery-admin-item";
-    wrap.innerHTML='<span>Foto '+(index+1)+'</span><input class="gallery-file" data-slot="'+index+'" type="file" accept="image/*"><small class="gallery-info" data-info="'+index+'"></small><img class="product-image-preview gallery-preview" data-preview="'+index+'" alt="Preview '+(index+1)+'" hidden><button type="button" class="small-btn delete gallery-remove">Hapus Foto</button>';
+    const wrap=document.createElement("div");wrap.className="gallery-admin-item";
+    wrap.innerHTML='<span>Foto '+(index+1)+'</span><input class="gallery-url" type="url" inputmode="url" placeholder="Tempel link berbagi Google Drive foto di sini" value="'+esc(item?.image_url||"")+'"><small class="gallery-info muted">'+(item?.image_url?"Tautan foto tersimpan.":"Belum ada tautan foto.")+'</small><img class="product-image-preview gallery-preview" alt="Pratinjau foto '+(index+1)+'" hidden><button type="button" class="small-btn delete gallery-remove">Hapus Foto</button>';
     list.appendChild(wrap);
-    const input=wrap.querySelector(".gallery-file"),img=wrap.querySelector(".gallery-preview"),info=wrap.querySelector(".gallery-info");input.dataset.currentUrl=item?.image_url||"";
-    if(item?.image_url){img.src=item.image_url;img.hidden=false;info.textContent="Gambar tersimpan. Pilih file baru untuk menggantinya."}else info.textContent="Belum ada foto";
-    input.onchange=async()=>{const f=input.files[0];if(!f)return;await prepareContentImageInput(input,f,"gallery",img,info)};
-    wrap.querySelector(".gallery-remove").onclick=()=>{wrap.remove();[...document.querySelectorAll("#galleryAdminList .gallery-admin-item")].forEach((el,n)=>{el.querySelector("span").textContent="Foto "+(n+1);el.querySelector(".gallery-file").dataset.slot=n;el.querySelector(".gallery-preview").dataset.preview=n;el.querySelector(".gallery-info").dataset.info=n})};
+    const input=wrap.querySelector(".gallery-url"),img=wrap.querySelector(".gallery-preview"),info=wrap.querySelector(".gallery-info");
+    input.dataset.originalUrl=item?.image_url||"";
+    if(item?.image_url){const preview=adminDriveImageUrl(item.image_url);if(preview){img.src=preview;img.hidden=false}}
+    input.onchange=()=>{
+      const url=input.value.trim();
+      if(!url){img.hidden=true;info.textContent="Belum ada tautan foto.";return}
+      if(!isValidHttpsUrl(url)){toast("Masukkan URL foto yang valid dan diawali https://.");input.value=input.dataset.originalUrl||"";return}
+      const preview=adminDriveImageUrl(url);
+      if(preview){img.src=preview;img.hidden=false;info.textContent="Pratinjau tautan foto. Pastikan akses Drive diatur ke siapa pun yang memiliki link."}
+      else{img.hidden=true;info.textContent="Tautan tersimpan; pratinjau hanya tersedia untuk link Google Drive yang dapat diakses."}
+    };
+    wrap.querySelector(".gallery-remove").onclick=()=>{wrap.remove();[...document.querySelectorAll("#galleryAdminList .gallery-admin-item")].forEach((el,n)=>el.querySelector("span").textContent="Foto "+(n+1))};
   });
 }
-function addGalleryAdminSlot(){const list=$("#galleryAdminList");if(!list)return;const items=getGalleryAdminItems().map(x=>({image_url:x.url}));items.push({image_url:""});renderGalleryAdmin(items)}
-function getGalleryAdminItems(){return [...document.querySelectorAll("#galleryAdminList .gallery-admin-item")].map(w=>({input:w.querySelector(".gallery-file"),url:w.querySelector(".gallery-file")?.dataset.currentUrl||""}))}
+function isValidHttpsUrl(raw){try{const u=new URL(String(raw||"").trim());return u.protocol==="https:"}catch(_){return false}}
+function googleDriveFileId(raw){
+  try{
+    const u=new URL(String(raw||""));
+    if(!/(^|\\.)drive\\.google\\.com$/i.test(u.hostname))return "";
+    const filePath=u.pathname.match(/\\/file\\/d\\/([a-zA-Z0-9_-]+)/);
+    return filePath?.[1]||u.searchParams.get("id")||"";
+  }catch(_){return ""}
+}
+function adminDriveImageUrl(raw){
+  const id=googleDriveFileId(raw);
+  return id?"https://drive.google.com/thumbnail?id="+encodeURIComponent(id)+"&sz=w1600":(isValidHttpsUrl(raw)?raw:"");
+}
+function addGalleryAdminSlot(){const items=getGalleryAdminItems().map(x=>({image_url:x.url}));items.push({image_url:""});renderGalleryAdmin(items)}
+function getGalleryAdminItems(){return [...document.querySelectorAll("#galleryAdminList .gallery-admin-item")].map(w=>{const input=w.querySelector(".gallery-url");return {input,url:input?.value.trim()||"",originalUrl:input?.dataset.originalUrl||""}}).filter(x=>x.url)}
 function renderVideoAdmin(items=[]){
   const list=$("#videoAdminList");if(!list)return;
   list.innerHTML="";
@@ -376,18 +397,19 @@ function renderVideoAdmin(items=[]){
     wrap.className="gallery-admin-item video-admin-item";
     wrap.innerHTML='<span>Video '+(index+1)+'</span>'+
       '<input class="video-title" type="text" placeholder="Judul video" value="'+esc(item?.title||"")+'">'+
-      '<input class="video-url" type="url" placeholder="https://youtube.com/... atau https://.../video.mp4" value="'+esc(item?.url||"")+'">'+
-      '<input class="video-file" type="file" accept="video/*">'+
-      '<small class="video-info muted">'+(item?.url?"Video tersimpan. Link/file baru akan menggantikannya.":"Belum ada video")+'</small>'+
+      '<input class="video-url" type="url" inputmode="url" placeholder="Tempel link Google Drive atau YouTube" value="'+esc(item?.url||"")+'">'+
+      '<small class="video-info muted">'+(item?.url?"Tautan video tersimpan.":"Tempel tautan Google Drive atau YouTube.")+'</small>'+
       '<button type="button" class="small-btn delete video-remove">Hapus Video</button>';
     list.appendChild(wrap);
-    const file=wrap.querySelector(".video-file");
-    file.dataset.currentUrl=item?.url||"";
-    file.onchange=()=>{
-      const f=file.files[0];if(!f)return;
-      try{validateContentVideoFile(f)}catch(error){toast(error.message);file.value="";return}
-      wrap.querySelector(".video-url").value="";
-      wrap.querySelector(".video-info").textContent=f.name+" • asli "+formatFileSize(f.size)+(f.size>AMASA_CONTENT_VIDEO_MAX_BYTES?" • akan dikompres otomatis saat disimpan (maks. 30 MB)":" • ukuran sesuai batas 30 MB");
+    const input=wrap.querySelector(".video-url");
+    input.dataset.originalUrl=item?.url||"";
+    input.onchange=()=>{
+      const url=input.value.trim();
+      if(!url){wrap.querySelector(".video-info").textContent="Tempel tautan Google Drive atau YouTube.";return}
+      if(!isValidHttpsUrl(url)){toast("Masukkan URL video yang valid dan diawali https://.");input.value=input.dataset.originalUrl||"";return}
+      wrap.querySelector(".video-info").textContent=isSupportedVideoLink(url)
+        ?"Tautan valid. Pastikan akses Google Drive dapat dilihat oleh pengunjung website."
+        :"URL valid, tetapi gunakan link berbagi Google Drive atau YouTube agar pemutaran didukung.";
     };
     wrap.querySelector(".video-remove").onclick=()=>{
       wrap.remove();
@@ -395,15 +417,15 @@ function renderVideoAdmin(items=[]){
     };
   });
 }
-function addVideoAdminSlot(){
-  renderVideoAdmin([...getVideoAdminItems(),{title:"",url:""}]);
+function isSupportedVideoLink(raw){
+  try{const u=new URL(String(raw||""));return /(^|\\.)drive\\.google\\.com$/i.test(u.hostname)||/(^|\\.)youtube\\.com$/i.test(u.hostname)||u.hostname==="youtu.be"}catch(_){return false}
 }
+function addVideoAdminSlot(){renderVideoAdmin([...getVideoAdminItems(),{title:"",url:""}])}
 function getVideoAdminItems(){
-  return [...document.querySelectorAll("#videoAdminList .video-admin-item")].map(w=>({
-    title:w.querySelector(".video-title")?.value.trim()||"Video AMASA",
-    url:w.querySelector(".video-url")?.value.trim()||"",
-    file:w.querySelector(".video-file")||null
-  })).filter(x=>x.url||x.file?.files?.[0]);
+  return [...document.querySelectorAll("#videoAdminList .video-admin-item")].map(w=>{
+    const input=w.querySelector(".video-url");
+    return {title:w.querySelector(".video-title")?.value.trim()||"Video AMASA",url:input?.value.trim()||"",originalUrl:input?.dataset.originalUrl||""};
+  }).filter(x=>x.url);
 }
 
 function renderTestimonialAdmin(items=[]){
@@ -954,11 +976,21 @@ $("#contentForm").onsubmit=async e=>{
   const sectionName=$("#contentSectionName").value,p={title:$("#contentTitle").value.trim()||null,subtitle:$("#contentSubtitle").value.trim()||null,content:$("#contentBody").value.trim()||null,image_url:$("#contentImage").dataset.currentUrl||null,button_text:null,button_url:null,is_active:$("#contentActive").checked,updated_at:new Date().toISOString()};
   if(sectionName==="Galeri"){
    const entries=getGalleryAdminItems(),items=[];
-   for(let n=0;n<entries.length;n++){let url=entries[n].url||"";if(entries[n].input?.files?.[0]){try{url=await uploadContentImage(entries[n].input._compressedFile||entries[n].input.files[0],"gallery")}catch(err){throw new Error("Gagal upload Foto "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({image_url:url,label:"PRODUCT GALLERY "+String(items.length+1).padStart(2,"0")})}
+   for(let n=0;n<entries.length;n++){
+    const url=entries[n].url;
+    if(!isValidHttpsUrl(url))throw new Error("Link Foto "+(n+1)+" harus berupa URL HTTPS yang valid.");
+    if(url!==entries[n].originalUrl&&!googleDriveFileId(url))throw new Error("Foto "+(n+1)+" harus menggunakan link berbagi file Google Drive.");
+    items.push({image_url:url,label:"PRODUCT GALLERY "+String(items.length+1).padStart(2,"0")});
+   }
    p.content=JSON.stringify({items});p.image_url=null;
   }else if(sectionName==="Video"){
    const entries=getVideoAdminItems(),items=[];
-   for(let n=0;n<entries.length;n++){let url=entries[n].url||entries[n].file?.dataset.currentUrl||"";if(entries[n].file?.files?.[0]){const info=entries[n].file.closest(".video-admin-item")?.querySelector(".video-info");try{url=await uploadContentVideo(entries[n].file.files[0],message=>{if(info)info.textContent=message})}catch(err){throw new Error("Gagal upload Video "+(n+1)+": "+(err?.message||"Failed to fetch"))}}if(url)items.push({title:entries[n].title||"Video AMASA",url})}
+   for(let n=0;n<entries.length;n++){
+    const url=entries[n].url;
+    if(!isValidHttpsUrl(url))throw new Error("Link Video "+(n+1)+" harus berupa URL HTTPS yang valid.");
+    if(url!==entries[n].originalUrl&&!isSupportedVideoLink(url))throw new Error("Video "+(n+1)+" harus menggunakan link berbagi Google Drive atau YouTube.");
+    items.push({title:entries[n].title||"Video AMASA",url});
+   }
    p.content=JSON.stringify({items});p.image_url=null;
   }else if(sectionName==="FAQ"){
    const items=getFaqAdminItems();
