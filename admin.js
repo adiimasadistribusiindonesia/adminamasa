@@ -764,8 +764,30 @@ async function recordContentVideoPass(file, profile, mimeType, keepAudio, onProg
     }
 
     const type = recorder.mimeType || chunks[0]?.type || mimeType || "video/webm";
-    const blob = new Blob(chunks, { type });
+    let blob = new Blob(chunks, { type });
     if (!blob.size) throw new Error("Hasil kompresi video kosong.");
+    if (blob.type.includes("webm")) {
+      onProgress?.("Memperbaiki metadata durasi dan navigasi video…");
+      if (!window.EBML?.Decoder || !window.EBML?.Reader || !window.EBML?.tools?.makeMetadataSeekable) {
+        throw new Error("Modul perbaikan metadata WebM tidak tersedia. Muat ulang halaman admin lalu coba lagi.");
+      }
+      const decoder = new window.EBML.Decoder();
+      const reader = new window.EBML.Reader();
+      const streamReader = blob.stream().getReader();
+      while (true) {
+        const part = await streamReader.read();
+        if (part.done) {
+          reader.stop();
+          break;
+        }
+        let elements = decoder.decode(part.value);
+        elements = elements?.filter(element => element.type !== "unknown") || [];
+        elements.forEach(element => reader.read(element));
+      }
+      const metadata = window.EBML.tools.makeMetadataSeekable(reader.metadatas, reader.duration, reader.cues);
+      blob = new Blob([metadata, blob.slice(reader.metadataSize)], { type: blob.type });
+      if (!blob.size) throw new Error("Perbaikan metadata video gagal.");
+    }
     return blob;
   } finally {
     if (rafId) cancelAnimationFrame(rafId);
