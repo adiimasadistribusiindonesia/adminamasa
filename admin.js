@@ -378,8 +378,8 @@ function isValidHttpsUrl(raw){try{const u=new URL(String(raw||"").trim());return
 function googleDriveFileId(raw){
   try{
     const u=new URL(String(raw||""));
-    if(!/(^|\\.)drive\\.google\\.com$/i.test(u.hostname))return "";
-    const filePath=u.pathname.match(/\\/file\\/d\\/([a-zA-Z0-9_-]+)/);
+    if(!/(^|\.)drive\.google\.com$/i.test(u.hostname))return "";
+    const filePath=u.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
     return filePath?.[1]||u.searchParams.get("id")||"";
   }catch(_){return ""}
 }
@@ -418,7 +418,7 @@ function renderVideoAdmin(items=[]){
   });
 }
 function isSupportedVideoLink(raw){
-  try{const u=new URL(String(raw||""));return /(^|\\.)drive\\.google\\.com$/i.test(u.hostname)||/(^|\\.)youtube\\.com$/i.test(u.hostname)||u.hostname==="youtu.be"}catch(_){return false}
+  try{const u=new URL(String(raw||""));return /(^|\.)drive\.google\.com$/i.test(u.hostname)||/(^|\.)youtube\.com$/i.test(u.hostname)||u.hostname==="youtu.be"}catch(_){return false}
 }
 function addVideoAdminSlot(){renderVideoAdmin([...getVideoAdminItems(),{title:"",url:""}])}
 function getVideoAdminItems(){
@@ -498,7 +498,7 @@ function openContentModal(item){
   $("#contentBodyWrap").hidden=item.section_slug==="about";$("#aboutParagraph1Wrap").hidden=item.section_slug!=="about";$("#aboutParagraph2Wrap").hidden=item.section_slug!=="about";
   $("#contentImage").value="";$("#contentImage").dataset.currentUrl=item.image_url||"";$("#contentImage")._compressedFile=null;$("#clearContentImage").hidden=!item.image_url;$("#contentImageInfo").textContent=item.image_url?"Gambar saat ini tersimpan. Pilih file baru untuk menggantinya.":"JPG, PNG, WEBP. Maksimal 5 MB sebelum kompresi otomatis ke WebP.";$("#contentImagePreview").src=item.image_url||"";$("#contentImagePreview").hidden=!item.image_url;$("#contentActive").checked=!!item.is_active;
   const isGallery=item.section_slug==="gallery",isVideo=item.section_slug==="video",isTestimonial=item.section_slug==="testimoni",isFaq=item.section_slug==="faq";
-  $("#contentBodyWrap").hidden=isGallery||isVideo||isTestimonial||isFaq||item.section_slug==="about";$("#galleryImagesWrap").hidden=!isGallery;$("#videoItemsWrap").hidden=!isVideo;$("#testimonialItemsWrap").hidden=!isTestimonial;$("#faqItemsWrap").hidden=!isFaq;$("#contentImageWrap").hidden=isGallery||isVideo||isTestimonial||isFaq;
+  $("#contentBodyWrap").hidden=isGallery||isVideo||isTestimonial||isFaq||item.section_slug==="about";$("#galleryImagesWrap").hidden=!isGallery;$("#videoItemsWrap").hidden=!isVideo;$("#mediaLinkGuide").hidden=!(isGallery||isVideo);$("#testimonialItemsWrap").hidden=!isTestimonial;$("#faqItemsWrap").hidden=!isFaq;$("#contentImageWrap").hidden=isGallery||isVideo||isTestimonial||isFaq;
   if(isGallery){let g={};try{g=JSON.parse(item.content||"{}")}catch(e){}let items=Array.isArray(g.items)?g.items:[];if(!items.length&&item.image_url)items=[{image_url:item.image_url,label:"PRODUCT GALLERY 01"}];renderGalleryAdmin(items)}else $("#galleryAdminList").innerHTML="";
   if(isVideo){let v={};try{v=JSON.parse(item.content||"{}")}catch(e){}renderVideoAdmin(Array.isArray(v.items)?v.items:[])}else $("#videoAdminList").innerHTML="";
   if(isTestimonial){let t={};try{t=JSON.parse(item.content||"{}")}catch(e){}renderTestimonialAdmin(Array.isArray(t.items)?t.items:[])}else $("#testimonialAdminList").innerHTML="";
