@@ -852,17 +852,23 @@ async function compressContentVideo(file, onProgress) {
   let lastError = null;
   const totalPasses = profiles.length * 2;
   let pass = 0;
+  let lastReportedOverallPct = 0;
   for (const keepAudio of [true, false]) {
     for (const profile of profiles) {
       pass++;
       const passLabel = "Kompresi " + profile.label + (keepAudio ? " + audio" : " tanpa audio") + " (" + pass + "/" + totalPasses + ")";
-      onProgress?.("Sedang mengompres video 0%");
+      const passStartPct = Math.round(((pass - 1) / totalPasses) * 100);
+      onProgress?.("Sedang mengompres video " + Math.max(lastReportedOverallPct, passStartPct) + "%");
       let result = null;
       for (const mimeType of mimeTypes) {
         try {
           const blob = await recordContentVideoPass(file, profile, mimeType, keepAudio, pct => {
-            const percent = Math.max(0, Math.min(99, Math.round(pct)));
-            onProgress?.("Sedang mengompres video " + percent + "%");
+            // Report progress across all compression passes, not just the current
+            // pass. This prevents the percentage jumping back to 1% on retries.
+            const withinPassPct = Math.max(0, Math.min(99, pct));
+            const overallPct = Math.min(99, Math.round(((pass - 1 + withinPassPct / 100) / totalPasses) * 100));
+            lastReportedOverallPct = Math.max(lastReportedOverallPct, overallPct);
+            onProgress?.("Sedang mengompres video " + lastReportedOverallPct + "%");
           });
           const resultType = blob.type.startsWith("video/") ? blob.type : (mimeType || "video/webm");
           const extension = resultType.includes("mp4") ? "mp4" : "webm";
@@ -887,6 +893,8 @@ async function compressContentVideo(file, onProgress) {
       if (!result) continue;
       if (!smallest || result.size < smallest.size) smallest = result;
       if (result.size <= AMASA_CONTENT_VIDEO_MAX_BYTES) {
+        lastReportedOverallPct = 100;
+        onProgress?.("Sedang mengompres video 100%");
         onProgress?.("Selesai: " + formatFileSize(result.size) + " (maksimal 20 MB).");
         return result;
       }
