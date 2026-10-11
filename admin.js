@@ -519,8 +519,8 @@ const AMASA_CONTENT_IMAGE_MAX_SOURCE = 5 * 1024 * 1024;
 const AMASA_CONTENT_VIDEO_MAX_BYTES = 30 * 1024 * 1024;
 const AMASA_CONTENT_VIDEO_MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const AMASA_CONTENT_IMAGE_TARGETS = {
-  hero: { maxBytes: 900 * 1024, maxDimension: 1920 },
-  about: { maxBytes: 900 * 1024, maxDimension: 1600 },
+  hero: { maxBytes: 300 * 1024, maxDimension: 1920 },
+  about: { maxBytes: 200 * 1024, maxDimension: 1600 },
   product: { maxBytes: 900 * 1024, maxDimension: 1800 },
   gallery: { maxBytes: 250 * 1024, maxDimension: 1600 }
 };
